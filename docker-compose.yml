@@ -1,0 +1,24 @@
+# Food Log: everything runs in containers. Nothing is installed on the Mac.
+#   docker-compose up dev        development server  -> http://localhost:5173
+#   docker-compose run --rm test unit tests
+#   docker-compose up --build web  finished app (tests + build + nginx) -> http://localhost:8080
+services:
+  dev:
+    build: { context: ., target: dev }
+    ports: ["5173:5173"]
+    volumes:
+      - ./:/app
+      - node_modules:/app/node_modules
+  test:
+    build: { context: ., target: dev }
+    command: ["npm", "test"]
+    volumes:
+      - ./:/app
+      - node_modules:/app/node_modules
+    profiles: ["tools"]
+  web:
+    build: { context: ., target: web }
+    ports: ["8080:80"]
+    profiles: ["prod"]
+volumes:
+  node_modules:

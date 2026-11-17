@@ -1,0 +1,22 @@
+# GGB Food Log: hosting with Docker, behind a reverse proxy you already run (for example Caddy).
+# This file starts ONE container: the app (nginx serving static files). It does not start a proxy.
+# The app stores nothing on the server: entries and photos stay in each visitor's own browser.
+#
+# A) Your Caddy runs on the host (not in Docker), or you only want local access:
+#      docker compose -f docker-compose.host.yml up -d --build
+#    The app listens on all interfaces, port 8080 (set BIND=<ip> in .env to restrict).
+#    Caddyfile:   food.example.com { reverse_proxy 127.0.0.1:8080 }
+#
+# B) Your Caddy runs in Docker: join its network so it can reach the app by name.
+#      echo 'CADDY_NETWORK=<your caddy network>' > .env
+#      docker compose -f docker-compose.host.yml -f docker-compose.network.yml up -d --build
+#    (the .env file also makes later commands such as `down` and `logs` work)
+#    Caddyfile:   food.example.com { reverse_proxy ggb-food-log:80 }
+#    (find the network name with: docker network ls)
+services:
+  app:
+    build: { context: ., target: web }
+    image: ggb-food-log:1.0
+    container_name: ggb-food-log
+    restart: unless-stopped
+    ports: ["${BIND:-0.0.0.0}:${PORT:-8080}:80"]

@@ -1,0 +1,12 @@
+# Used together with docker-compose.host.yml to attach the app to the Docker network
+# your existing Caddy is on. Set CADDY_NETWORK to that network's name (docker network ls).
+services:
+  app:
+    # In this mode your Caddy reaches the app by name, so no host port is needed.
+    ports: !reset []
+    networks: [proxy]
+
+networks:
+  proxy:
+    external: true
+    name: ${CADDY_NETWORK:?set CADDY_NETWORK to the name of your Caddy docker network}

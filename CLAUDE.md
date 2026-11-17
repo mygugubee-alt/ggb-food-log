@@ -1,0 +1,21 @@
+# GGB Food Log: notes for Claude Code
+
+- Read `../spec.md` (v1.6) before making changes. It is the source of truth.
+- Everything runs in Docker (Colima on this Mac). Do not install Node packages on the host.
+  - Dev server: `docker-compose up -d dev` → http://localhost:5173
+  - Tests: `docker-compose run --rm test`
+  - Type-check: `docker-compose run --rm test npx tsc --noEmit`
+  - Production (tests + build + nginx): `docker-compose --profile prod up -d --build web` → http://localhost:8080
+  - After changing `package.json`, rebuild: `docker-compose build dev` and remove the `food-log_node_modules` volume.
+- TypeScript strict mode.
+- Change the database only by adding a new Dexie `version(n)` with an upgrade step in `src/db/db.ts`. Never edit an old version.
+- Do not add analytics, third-party scripts, or anything loaded from another site at run time. Bundle everything.
+- Do not add calorie targets, goal suggestions, goal timelines, or any interpretation of weight. Blood sugar and HbA1c are rated only by the rules in spec section 5.11 (`src/services/ranges.ts`); do not add other thresholds, diagnoses, or dosing advice.
+- Blood sugar: keep `value_mmol` at full precision and `entered_value` / `entered_unit` untouched. Convert and round only at display, with the single constant 18.016 (`src/utils/units.ts`).
+- Timestamps are UTC. Calendar dates are Asia/Kuala_Lumpur (`src/utils/dates.ts`).
+- Every query must leave out rows with `deleted_at` set. Deletes are soft until the Undo window ends (`softDelete` / `restore` / `purge` in `src/db/repo.ts`).
+- Lists use thumbnails only (`thumbs` table). Full images (`images` table) are loaded only by the photo viewer and export.
+- Report averages ignore empty fields and show the number of days used. Never add the day calorie total and meal calories together (`src/services/calories.ts`).
+- UI text goes in `src/strings/en.ts`.
+- Ask before adding a dependency, and explain why it is needed.
+- Keep commits small, one feature per commit.
