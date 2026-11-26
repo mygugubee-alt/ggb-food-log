@@ -65,3 +65,32 @@ export async function makeAvatar(file: Blob): Promise<ArrayBuffer> {
   if (!blob) throw new Error('The photo could not be processed.')
   return blob.arrayBuffer()
 }
+
+/**
+ * Reads a photo of a monitor's screen on the phone: nothing is stored or sent.
+ * Returns the reading and a small preview with the found rows outlined.
+ */
+export async function readMonitorPhoto(file: Blob): Promise<{ result: import('./segReader').SegResult; preview: string }> {
+  const { readMonitor, toGray } = await import('./segReader')
+  const img = await loadImage(file)
+  const scale = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight))
+  const width = Math.max(1, Math.round(img.naturalWidth * scale))
+  const height = Math.max(1, Math.round(img.naturalHeight * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  if (!ctx) throw new Error('The photo could not be processed.')
+  ctx.drawImage(img, 0, 0, width, height)
+  const pixels = ctx.getImageData(0, 0, width, height)
+  const result = readMonitor(toGray(pixels.data, width, height, 1000))
+  // Outline what was read, then shrink for the preview.
+  ctx.lineWidth = Math.max(2, width / 250)
+  ctx.strokeStyle = '#2bb673'
+  if (result.lcd) ctx.strokeRect(result.lcd.x, result.lcd.y, result.lcd.w, result.lcd.h)
+  ctx.strokeStyle = '#ff7a00'
+  for (const r of result.rows) ctx.strokeRect(r.x, r.y, r.w, r.h)
+  const preview = canvas.toDataURL('image/jpeg', 0.7)
+  canvas.width = canvas.height = 0
+  return { result, preview }
+}

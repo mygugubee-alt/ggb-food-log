@@ -348,10 +348,6 @@ mark { background: var(--mark); color: inherit; border-radius: 4px; padding: 0 2
 .hero-pill.bmi-under::before, .hero-pill.bmi-over::before { background: #ffd166; }
 .hero-pill.bmi-obese::before { background: #ff8a7a; }
 
-/* Weight line on Today */
-button.card.weight-line { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 12px; }
-.weight-line .big { text-align: right; }
-.weight-line > .sub { grid-column: 1 / -1; text-align: right; }
 
 /* Calorie intake card */
 .cal-card { display: block; }
@@ -382,3 +378,11 @@ button.card.weight-line { display: grid; grid-template-columns: 1fr auto; align-
 .bp-num-label { font-size: 0.78rem; font-weight: 750; letter-spacing: 0.06em; color: var(--text2); }
 .bp-num .input { text-align: center; font-family: var(--display); font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; padding: 10px 4px; }
 .notice { background: var(--accent-soft); color: var(--text); border-radius: var(--radius-s); padding: 10px 12px; font-size: 0.9rem; }
+.bp-preview { width: 100%; border-radius: var(--radius-s); display: block; }
+
+/* Date picker in the Today title row */
+.date-switch.compact { box-shadow: none; background: var(--surface); padding: 2px; border-radius: 14px; gap: 0; }
+.date-switch.compact .icon-btn { min-width: 36px; min-height: 40px; font-size: 1.4rem; }
+.date-switch.compact .label { flex: none; font-size: 0.92rem; white-space: nowrap; padding: 0 2px; }
+.date-switch.compact .btn { min-height: 34px; padding: 4px 10px; font-size: 0.82rem; margin-left: 2px; }
+.with-tabs .topbar h1 { min-width: 0; }

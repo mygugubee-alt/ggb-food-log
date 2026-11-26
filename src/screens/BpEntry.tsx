@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { db } from '../db/db'
 import { saveBp } from '../db/repo'
 import { BP_TONE, bpBand } from '../services/ranges'
 import { S } from '../strings/en'
-import { BP_LIMITS, parseBpNumber, parseBpScan } from '../utils/bp'
+import { BP_LIMITS, parseBpNumber } from '../utils/bp'
+import { readMonitorPhoto } from '../services/photos'
 import { formatDate, isValidDate, isValidTime, klParts, nowTimeKL, todayKL } from '../utils/dates'
 import { Field, goBack, Page, useDelete, useUI } from '../components/ui'
 
@@ -22,8 +23,8 @@ export default function BpEntry() {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [missing, setMissing] = useState(false)
   const [errors, setErrors] = useState<Errors>({})
-  const [scan, setScan] = useState('')
   const [scanMsg, setScanMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
   const initial = useRef('')
 
   const blank = (date: string): Draft => ({ date, time: date === todayKL() ? nowTimeKL() : '', sys: '', dia: '', pulse: '' })
@@ -60,15 +61,23 @@ export default function BpEntry() {
     if (!dirty || (await ui.confirm(S.discardConfirm, S.discard, true))) goBack(nav)
   }
 
-  /** Fills the three fields from scanned (or typed) text as soon as it arrives. */
-  const onScan = (text: string) => {
-    setScan(text)
-    if (text.trim() === '') { setScanMsg(null); return }
-    const r = parseBpScan(text)
-    if (r.systolic == null || r.diastolic == null) { setScanMsg({ ok: false, text: S.bp.scanNone }); return }
-    set({ sys: String(r.systolic), dia: String(r.diastolic), pulse: r.pulse == null ? draft.pulse : String(r.pulse) })
+  /** Reads SYS, DIA and pulse from a photo of the monitor and fills the fields. */
+  const onPhoto = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const out = await ui.run(() => readMonitorPhoto(file), S.bp.reading)
+    if (!out) return
+    const { result: r, preview: p } = out
+    setPreview(p)
     setErrors({})
-    setScanMsg({ ok: true, text: S.bp.scanFound(String(r.systolic), String(r.diastolic), r.pulse == null ? '–' : String(r.pulse)) })
+    const str = (v: number | null) => (v == null ? '' : String(v))
+    if (r.systolic == null && r.diastolic == null && r.pulse == null) { setScanMsg({ ok: false, text: S.bp.photoNone }); return }
+    set({ sys: str(r.systolic), dia: str(r.diastolic), pulse: str(r.pulse) })
+    const all = r.systolic != null && r.diastolic != null && r.pulse != null
+    setScanMsg(all
+      ? { ok: true, text: S.bp.photoFound(str(r.systolic), str(r.diastolic), str(r.pulse)) }
+      : { ok: false, text: S.bp.photoPartial })
   }
 
   const sys = parseBpNumber(draft.sys, BP_LIMITS.sys)
@@ -107,13 +116,20 @@ export default function BpEntry() {
 
       {isNew && (
         <div className="card stack">
-          <Field label={S.bp.scanLabel} htmlFor="bp-scan" note={<span className="muted"> </span>}>
-            {/* A plain text box: the iPhone keyboard shows its Scan Text button only for text, not number pads. */}
-            <textarea id="bp-scan" className="input" rows={2} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
-              placeholder={S.bp.scanPlaceholder} value={scan} onChange={(e) => onScan(e.target.value)} />
-          </Field>
+          <span className="label">{S.bp.photoLabel}</span>
+          <div className="actions">
+            <label className="btn primary">
+              <input className="sr-only" type="file" accept="image/*" capture="environment" onChange={(e) => { void onPhoto(e) }} />
+              {S.bp.takePhoto}
+            </label>
+            <label className="btn">
+              <input className="sr-only" type="file" accept="image/*" onChange={(e) => { void onPhoto(e) }} />
+              {S.bp.choosePhoto}
+            </label>
+          </div>
+          {preview && <img className="bp-preview" src={preview} alt="" />}
           {scanMsg && <div className={scanMsg.ok ? 'notice' : 'error'} role="status">{scanMsg.text}{scanMsg.ok && <><br /><span className="muted">{S.bp.checkPrior}</span></>}</div>}
-          <p className="muted" style={{ margin: 0 }}>{S.bp.scanHelp}</p>
+          <p className="muted" style={{ margin: 0 }}>{S.bp.photoHelp}</p>
         </div>
       )}
 

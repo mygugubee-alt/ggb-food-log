@@ -1,30 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '../src/db/db'
 import { getDay, loadDayBundle, purge, restore, saveBp, softDelete } from '../src/db/repo'
-import { parseBpNumber, parseBpScan } from '../src/utils/bp'
+import { parseBpNumber } from '../src/utils/bp'
 import { collectExportData, validateExport } from '../src/services/exportImport'
 
-describe('reading a scanned monitor screen', () => {
-  it('takes SYS, DIA and pulse in order', () => {
-    expect(parseBpScan('121\n84\n71')).toEqual({ systolic: 121, diastolic: 84, pulse: 71 })
-    expect(parseBpScan('121/84 71')).toEqual({ systolic: 121, diastolic: 84, pulse: 71 })
-  })
-  it('skips clock times and labels', () => {
-    expect(parseBpScan('10:01 PM SYS mmHg 121 DIA mmHg 84 PULSE /min 71')).toEqual({ systolic: 121, diastolic: 84, pulse: 71 })
-  })
-  it('ignores the PRIOR reading when the labels are there', () => {
-    expect(parseBpScan('OMRON PRIOR 9:49 PM 116 74 72 SYS mmHg 121 10:01 PM DIA mmHg 84 PULSE /min 71'))
-      .toEqual({ systolic: 121, diastolic: 84, pulse: 71 })
-    expect(parseBpScan('PRIOR 9:49PM\n116\n74\n72\nSYS\nmmHg\nDIA\nmmHg\nPULSE /min\n121\n84\n71'))
-      .toEqual({ systolic: 121, diastolic: 84, pulse: 71 })
-  })
-  it('fixes common misreads of segment digits', () => {
-    expect(parseBpScan('I2I 84 7I')).toEqual({ systolic: 121, diastolic: 84, pulse: 71 })
-  })
-  it('leaves out what it cannot find', () => {
-    expect(parseBpScan('hello')).toEqual({ systolic: null, diastolic: null, pulse: null })
-    expect(parseBpScan('121 84')).toEqual({ systolic: 121, diastolic: 84, pulse: null })
-  })
+describe('typed blood pressure numbers', () => {
   it('checks typed numbers', () => {
     expect(parseBpNumber('121', [60, 260])).toBe(121)
     expect(parseBpNumber('12', [60, 260])).toBeNull()
