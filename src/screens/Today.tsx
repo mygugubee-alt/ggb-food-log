@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { burnedKcal, isLogged, latestWeight, listA1c, loadDayBundle } from '../db/repo'
+import { burnedKcal, isLogged, listA1c, loadDayBundle } from '../db/repo'
 import { A1C_TONE, a1cBand } from '../services/ranges'
 import { S } from '../strings/en'
 import { addDays, formatDate, formatShort, formatWeekday, isValidDate, todayKL } from '../utils/dates'
-import { formatKg, roundTo } from '../utils/units'
 import { useExportDue, useSettings } from '../components/hooks'
 import { Badge, Icon } from '../components/icons'
 import { Thumb } from '../components/photos'
@@ -34,7 +33,6 @@ export default function Today() {
   const nav = useNavigate()
   const settings = useSettings()
   const bundle = useLiveQuery(() => loadDayBundle(date), [date])
-  const previous = useLiveQuery(() => latestWeight(date, false), [date])
   const latestA1c = useLiveQuery(async () => (await listA1c())[0] ?? null)
   const [revealed, setRevealed] = useState(false)
   useEffect(() => setRevealed(false), [date])
@@ -44,18 +42,33 @@ export default function Today() {
   const day = bundle?.day ?? null
   const burned = bundle ? burnedKcal(bundle.activities) : null
   const dayPhotos = bundle?.photos.filter((p) => p.meal_id == null) ?? []
-  const diff = day?.weight_kg != null && previous ? roundTo(day.weight_kg - previous.weight_kg, 1) : null
+
+  const a1cTile = (
+    <button className="tile" onClick={() => nav('/a1c')}>
+      <Badge name="flask" tone="plain" />
+      <span className="grow">
+        {S.a1c.title}
+        <span className="sub" style={{ display: 'block', fontWeight: 400 }}>{latestA1c ? S.a1c.latest(latestA1c.value_percent.toFixed(1), formatShort(latestA1c.test_date)) : S.a1c.record}</span>
+      </span>
+      {latestA1c && settings.range_mode !== 'off' && <span className={`level lvl-bg-${A1C_TONE[a1cBand(latestA1c.value_percent)]}`}>{S.a1c.band[a1cBand(latestA1c.value_percent)]}</span>}
+      <span className="chev"><Icon name="chevron" size={18} /></span>
+    </button>
+  )
 
   return (
-    <Page title={S.today} tabs>
+    <Page title={S.today} tabs right={
+      <div className="date-switch compact">
+        <button className="icon-btn" aria-label={S.prevDay} onClick={() => go(addDays(date, -1))}>‹</button>
+        <div className="label" aria-label={`${formatWeekday(date)}, ${formatDate(date)}`}>
+          {/* This year: weekday and day; other years: the full date. */}
+          {date.slice(0, 4) === today.slice(0, 4) ? `${formatWeekday(date)}, ${formatShort(date)}` : formatDate(date)}
+        </div>
+        <button className="icon-btn" aria-label={S.nextDay} disabled={date >= today} onClick={() => go(addDays(date, 1))}>›</button>
+        {date !== today && <button className="btn" onClick={() => go(today)}>{S.today}</button>}
+      </div>
+    }>
       <GoalCard />
       <ExportPrompt />
-      <div className="date-switch">
-        <button className="icon-btn" aria-label={S.prevDay} onClick={() => go(addDays(date, -1))}>‹</button>
-        <div className="label">{formatWeekday(date)}, {formatDate(date)}</div>
-        <button className="icon-btn" aria-label={S.nextDay} disabled={date >= today} onClick={() => go(addDays(date, 1))}>›</button>
-        <button className="btn" disabled={date === today} onClick={() => go(today)}>{S.today}</button>
-      </div>
 
       <button className="btn primary large" onClick={() => nav(`/meal/new?date=${date}`)}><Icon name="plus" />{S.addMealPlain}</button>
       <div className="actions">
@@ -65,15 +78,6 @@ export default function Today() {
       <button className="tile" onClick={() => nav(`/bp/new?date=${date}`)}><Badge name="heart" tone="warm" /><span className="grow">{S.bp.log}</span><span className="chev"><Icon name="chevron" size={18} /></span></button>
       <button className="tile" onClick={() => nav(`/activity/new?date=${date}`)}><Badge name="pulse" tone="green" /><span className="grow">{S.act.add}</span><span className="chev"><Icon name="chevron" size={18} /></span></button>
 
-      <button className="tile" onClick={() => nav('/a1c')}>
-        <Badge name="flask" tone="plain" />
-        <span className="grow">
-          {S.a1c.title}
-          <span className="sub" style={{ display: 'block', fontWeight: 400 }}>{latestA1c ? S.a1c.latest(latestA1c.value_percent.toFixed(1), formatShort(latestA1c.test_date)) : S.a1c.record}</span>
-        </span>
-        {latestA1c && settings.range_mode !== 'off' && <span className={`level lvl-bg-${A1C_TONE[a1cBand(latestA1c.value_percent)]}`}>{S.a1c.band[a1cBand(latestA1c.value_percent)]}</span>}
-        <span className="chev"><Icon name="chevron" size={18} /></span>
-      </button>
 
       {bundle && !isLogged(bundle) && (
         <div className="card empty">
@@ -86,19 +90,10 @@ export default function Today() {
           <div>{date === today ? S.startToday : S.nothingLogged}</div>
         </div>
       )}
+      {bundle && !isLogged(bundle) && a1cTile}
 
       {bundle && isLogged(bundle) && (
         <>
-          {day?.weight_kg != null && (
-            <button className="card weight-line" onClick={edit}>
-              <h2 style={{ margin: 0 }}><Icon name="scale" size={16} />{S.weight}</h2>
-              <span className="big">{formatKg(day.weight_kg)} <span className="sub">{S.kg}</span></span>
-              {diff != null && previous && (
-                <span className="sub">{S.changeVs(`${diff > 0 ? '+' : ''}${diff.toFixed(1)}`, formatShort(previous.date))}</span>
-              )}
-            </button>
-          )}
-
           {(bundle.meals.length > 0 || burned != null) && (
             <CalorieCard meals={bundle.meals} burned={burned} goal={settings.kcal_target} onClick={edit} />
           )}
@@ -124,6 +119,8 @@ export default function Today() {
               </ul>
             </div>
           )}
+
+          {a1cTile}
 
           {bundle.readings.length > 0 && (
             <div className="card">
