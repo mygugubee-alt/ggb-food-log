@@ -208,7 +208,7 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
 .draft-photo .icon-btn { min-width: 24px; min-height: 36px; font-size: 1.1rem; }
 
 /* Dream weight card */
-.hero { position: relative; overflow: hidden; width: 100%; text-align: left; cursor: pointer; border: 0; border-radius: 24px; padding: 18px 20px;
+.hero { position: relative; overflow: hidden; overflow: clip; width: 100%; text-align: left; cursor: pointer; border: 0; border-radius: 24px; padding: 18px 20px;
   color: #fff; background: linear-gradient(135deg, var(--hero-a), var(--hero-b)); box-shadow: 0 10px 28px color-mix(in srgb, var(--hero-a) 35%, transparent);
   transition: transform 0.12s ease; }
 .hero::before, .hero::after { content: ""; position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.08); pointer-events: none; }
@@ -316,3 +316,69 @@ mark { background: var(--mark); color: inherit; border-radius: 4px; padding: 0 2
   .card { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; }
   .print-footer { margin-top: 16px; text-align: center; font-size: 0.85rem; color: #333; }
 }
+
+/* Weight card: dream weight  ←— diff —  latest weight */
+.hero-track { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.hero-end { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.hero-end.right { text-align: right; }
+.hero-end strong { font-family: var(--display); font-size: 1.05rem; font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hero-small { font-size: 0.76rem; opacity: 0.88; }
+.hero-arrow { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 48px; }
+.hero-arrow span { font-size: 0.82rem; font-weight: 750; white-space: nowrap; margin-bottom: 2px; }
+.hero-arrow svg { width: 100%; height: 10px; overflow: visible; }
+.hero-arrow path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+/* BMI bar inside the weight card */
+.bmi { margin-top: 14px; }
+.bmi-scale { position: relative; padding-top: 38px; }
+.bmi-bubble { position: absolute; top: 4px; transform: translateX(-50%); background: #fff; color: #2b2620; font-family: var(--display);
+  font-weight: 800; font-size: 0.95rem; font-variant-numeric: tabular-nums; padding: 3px 10px; border-radius: 9px; box-shadow: 0 2px 6px rgba(0,0,0,0.18); }
+.bmi-pin { position: absolute; top: 30px; width: 0; height: 0; transform: translateX(-50%);
+  border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid #fff; }
+.bmi-edge { position: absolute; top: 24px; transform: translateX(-50%); font-size: 0.68rem; opacity: 0.85; font-variant-numeric: tabular-nums; }
+.bmi-bar { display: flex; gap: 2px; height: 7px; border-radius: 99px; overflow: hidden; }
+.bmi-seg { flex: 1; }
+.seg-under { background: #ffd166; } .seg-healthy { background: #6fdca5; } .seg-over { background: #ffa94d; } .seg-obese { background: #ff6f61; }
+.bmi-names { display: flex; margin-top: 5px; font-size: 0.72rem; }
+.bmi-names span { flex: 1; text-align: center; opacity: 0.72; }
+.bmi-names span.on { opacity: 1; font-weight: 800; }
+.hero-pill.bmi-healthy { background: rgba(255, 255, 255, 0.28); }
+.hero-pill.bmi-healthy::before, .hero-pill.bmi-over::before, .hero-pill.bmi-obese::before, .hero-pill.bmi-under::before {
+  content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.hero-pill.bmi-healthy::before { background: #7be0b0; }
+.hero-pill.bmi-under::before, .hero-pill.bmi-over::before { background: #ffd166; }
+.hero-pill.bmi-obese::before { background: #ff8a7a; }
+
+/* Weight line on Today */
+button.card.weight-line { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 12px; }
+.weight-line .big { text-align: right; }
+.weight-line > .sub { grid-column: 1 / -1; text-align: right; }
+
+/* Calorie intake card */
+.cal-card { display: block; }
+.meal-breakfast { --meal: #4fcfd4; } .meal-lunch { --meal: #ef7a72; } .meal-dinner { --meal: #f3c63f; } .meal-snack { --meal: #9d8df1; }
+.cal-body { display: flex; align-items: center; gap: 18px; margin-top: 12px; }
+.cal-ring { position: relative; flex: 0 0 auto; width: min(46vw, 168px); aspect-ratio: 1; }
+.cal-ring svg { width: 100%; height: 100%; display: block; }
+.cal-track { fill: none; stroke: var(--line); stroke-width: 12; }
+.cal-seg { fill: none; stroke: var(--meal); stroke-width: 12; transition: stroke-dasharray 0.4s ease; }
+.cal-centre { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; line-height: 1.1; }
+.cal-centre strong { font-family: var(--display); font-size: 1.75rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.cal-centre .cal-over { color: var(--danger); }
+.cal-unit { font-size: 0.8rem; color: var(--text2); font-weight: 650; }
+.cal-caption { font-size: 0.74rem; color: var(--muted); margin-top: 4px; max-width: 90px; }
+.cal-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
+.cal-legend li { display: flex; align-items: flex-start; gap: 10px; }
+.cal-legend strong { display: block; font-family: var(--display); font-size: 1.08rem; font-weight: 750; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.cal-legend small { font-size: 0.72rem; font-weight: 650; color: var(--text2); }
+.cal-legend .sub { display: block; font-size: 0.8rem; }
+.cal-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--meal); margin-top: 4px; flex: 0 0 auto; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+.cal-foot { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 0.88rem; color: var(--text2); }
+.cal-foot strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.cal-foot svg { vertical-align: -2px; }
+
+/* Blood pressure entry */
+.bp-nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.bp-num { display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; }
+.bp-num-label { font-size: 0.78rem; font-weight: 750; letter-spacing: 0.06em; color: var(--text2); }
+.bp-num .input { text-align: center; font-family: var(--display); font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; padding: 10px 4px; }
+.notice { background: var(--accent-soft); color: var(--text); border-radius: var(--radius-s); padding: 10px 12px; font-size: 0.9rem; }

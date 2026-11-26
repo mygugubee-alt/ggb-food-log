@@ -7,7 +7,7 @@ import { makeAvatar, makeThumb } from '../services/photos'
 import { S } from '../strings/en'
 import { THEMES } from '../theme/themes'
 import { formatDateTime } from '../utils/dates'
-import { fromMmol, parseSugarInput, toMmol, unitLabel } from '../utils/units'
+import { fromMmol, parseHeight, parseKcalTarget, parseSugarInput, toMmol, unitLabel } from '../utils/units'
 import type { RangeMode, SugarUnit } from '../models/types'
 import { useExportDue, useSettings } from '../components/hooks'
 import { Avatar } from '../components/photos'
@@ -50,6 +50,54 @@ function TargetField({ label, mmol, unit, onSave }: { label: string; mmol: numbe
         <span className="sub" style={{ whiteSpace: 'nowrap' }}>{unitLabel(unit)}</span>
       </div>
     </label>
+  )
+}
+
+/** Height for BMI. Saves when the field loses focus; an empty field clears it. */
+function HeightField({ cm }: { cm: number | null }) {
+  const shown = cm == null ? '' : String(cm)
+  const [text, setText] = useState(shown)
+  const [bad, setBad] = useState(false)
+  useEffect(() => { setText(shown); setBad(false) }, [shown])
+  const commit = () => {
+    if (text.trim() === shown) { setBad(false); return }
+    if (text.trim() === '') { setBad(false); void setSetting('height_cm', null); return }
+    const v = parseHeight(text)
+    if (v == null) { setBad(true); return }
+    setBad(false)
+    void setSetting('height_cm', v)
+  }
+  return (
+    <div className="field">
+      <label htmlFor="height"><span className="label">{S.heightField}</span></label>
+      <input id="height" className="input" inputMode="decimal" autoComplete="off" placeholder="160" aria-invalid={bad} value={text}
+        onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+      {bad ? <div className="error" role="alert">{S.heightError}</div> : <span className="muted">{S.heightNote} {S.bmiScaleNote}</span>}
+    </div>
+  )
+}
+
+/** Daily calorie goal. Saves on blur; empty clears it. */
+function KcalTargetField({ kcal }: { kcal: number | null }) {
+  const shown = kcal == null ? '' : String(kcal)
+  const [text, setText] = useState(shown)
+  const [bad, setBad] = useState(false)
+  useEffect(() => { setText(shown); setBad(false) }, [shown])
+  const commit = () => {
+    if (text.trim() === shown) { setBad(false); return }
+    if (text.trim() === '') { setBad(false); void setSetting('kcal_target', null); return }
+    const v = parseKcalTarget(text)
+    if (v == null) { setBad(true); return }
+    setBad(false)
+    void setSetting('kcal_target', v)
+  }
+  return (
+    <div className="field">
+      <label htmlFor="kcal-target"><span className="label">{S.kcalTargetField}</span></label>
+      <input id="kcal-target" className="input" inputMode="numeric" autoComplete="off" placeholder="1500" aria-invalid={bad} value={text}
+        onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+      {bad ? <div className="error" role="alert">{S.kcalTargetError}</div> : <span className="muted">{S.kcalTargetNote}</span>}
+    </div>
   )
 }
 
@@ -167,6 +215,12 @@ export default function Settings() {
         </div>
         <p><strong>{THEMES.find((t) => t.id === settings.theme)?.label}</strong></p>
         <p className="muted">{S.colourNote}</p>
+      </div>
+
+      <div className="card stack">
+        <h2 style={{ marginBottom: 0 }}>{S.body}</h2>
+        <HeightField cm={settings.height_cm} />
+        <KcalTargetField kcal={settings.kcal_target} />
       </div>
 
       <div className="card stack">

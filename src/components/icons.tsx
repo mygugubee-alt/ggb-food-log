@@ -13,6 +13,7 @@ const PATHS: Record<string, ReactNode> = {
   chevron: <path d="m9 6 6 6-6 6" />,
   cherry: <><circle cx="8" cy="16.500" r="3.600" /><circle cx="16.500" cy="17.200" r="3.600" /><path d="M8.500 13c.800-3.800 3.800-6.800 8.500-9M16.500 13.600c-.300-3.400 0-6.600.500-9.600" /></>,
   flask: <path d="M9 3h6M10 3v6l-5.200 9a2 2 0 0 0 1.700 3h11a2 2 0 0 0 1.700-3L14 9V3M7.800 15h8.400" />,
+  heart: <path d="M12 19.500s-7-4.300-7-9.300A3.900 3.900 0 0 1 12 8a3.900 3.900 0 0 1 7 2.200c0 5-7 9.300-7 9.300z" />,
   info: <><circle cx="12" cy="12" r="8.500" /><path d="M12 11v5M12 8h.010" /></>,
   user: <><circle cx="12" cy="8.500" r="3.700" /><path d="M4.500 20a7.500 7.500 0 0 1 15 0" /></>,
   breakfast: <path d="M4 17.500h16M7 17.500a5 5 0 0 1 10 0M12 6v2.500M5.500 10l1.600 1.600M18.500 10l-1.600 1.600" />,
@@ -21,7 +22,7 @@ const PATHS: Record<string, ReactNode> = {
   snack: <><circle cx="12" cy="12" r="8" /><path d="M9.500 10h.010M14.200 9.200h.010M13.300 14.600h.010M9.300 14.800h.010" strokeWidth="2.400" /></>,
 }
 
-export type IconName = 'plus' | 'scale' | 'drop' | 'flame' | 'utensils' | 'note' | 'pulse' | 'camera' | 'chevron' | 'user' | 'cherry' | 'flask' | 'info' | MealType
+export type IconName = 'plus' | 'scale' | 'drop' | 'flame' | 'utensils' | 'note' | 'pulse' | 'camera' | 'chevron' | 'user' | 'cherry' | 'flask' | 'info' | 'heart' | MealType
 
 /** Small line icons, drawn in the app (nothing is loaded from other sites). */
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {

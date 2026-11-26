@@ -2,15 +2,15 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { burnedKcal, isLogged, latestWeight, listA1c, loadDayBundle } from '../db/repo'
-import { dayCalories } from '../services/calories'
 import { A1C_TONE, a1cBand } from '../services/ranges'
 import { S } from '../strings/en'
 import { addDays, formatDate, formatShort, formatWeekday, isValidDate, todayKL } from '../utils/dates'
-import { formatKcal, formatKg, roundTo } from '../utils/units'
+import { formatKg, roundTo } from '../utils/units'
 import { useExportDue, useSettings } from '../components/hooks'
 import { Badge, Icon } from '../components/icons'
 import { Thumb } from '../components/photos'
-import { ActivitySummary, GoalCard, MealSummary, ReadingSummary } from '../components/rows'
+import { CalorieCard } from '../components/calorieRing'
+import { ActivitySummary, BpSummary, GoalCard, MealSummary, ReadingSummary } from '../components/rows'
 import { Page } from '../components/ui'
 
 function ExportPrompt() {
@@ -42,7 +42,6 @@ export default function Today() {
   const go = (d: string) => setParams(d === today ? {} : { date: d }, { replace: true })
   const edit = () => nav(`/day/${date}`)
   const day = bundle?.day ?? null
-  const kcal = bundle ? dayCalories(day, bundle.meals) : null
   const burned = bundle ? burnedKcal(bundle.activities) : null
   const dayPhotos = bundle?.photos.filter((p) => p.meal_id == null) ?? []
   const diff = day?.weight_kg != null && previous ? roundTo(day.weight_kg - previous.weight_kg, 1) : null
@@ -63,6 +62,7 @@ export default function Today() {
         <button className="tile" onClick={() => nav(`/day/${date}?focus=weight`)}><Badge name="scale" tone="green" />{S.logWeight}</button>
         <button className="tile" onClick={() => nav(`/sugar/new?date=${date}`)}><Badge name="drop" tone="blue" />{S.logSugar}</button>
       </div>
+      <button className="tile" onClick={() => nav(`/bp/new?date=${date}`)}><Badge name="heart" tone="warm" /><span className="grow">{S.bp.log}</span><span className="chev"><Icon name="chevron" size={18} /></span></button>
       <button className="tile" onClick={() => nav(`/activity/new?date=${date}`)}><Badge name="pulse" tone="green" /><span className="grow">{S.act.add}</span><span className="chev"><Icon name="chevron" size={18} /></span></button>
 
       <button className="tile" onClick={() => nav('/a1c')}>
@@ -89,40 +89,18 @@ export default function Today() {
 
       {bundle && isLogged(bundle) && (
         <>
-          {(day?.weight_kg != null || kcal || burned != null) && (
-            <button className="card" onClick={edit}>
-              <div className="metrics">
-                {day?.weight_kg != null && (
-                  <div>
-                    <h2><Icon name="scale" size={16} />{S.weight}</h2>
-                    <div className="big">{formatKg(day.weight_kg)} <span className="sub">{S.kg}</span></div>
-                    {diff != null && previous && (
-                      <div className="sub">{S.changeVs(`${diff > 0 ? '+' : ''}${diff.toFixed(1)}`, formatShort(previous.date))}</div>
-                    )}
-                  </div>
-                )}
-                {kcal && (
-                  <div>
-                    <h2><Icon name="flame" size={16} />{S.eaten}</h2>
-                    <div className="big">{formatKcal(kcal.value)} <span className="sub">{S.kcal}</span></div>
-                  </div>
-                )}
-                {burned != null && (
-                  <div>
-                    <h2><Icon name="pulse" size={16} />{S.burned}</h2>
-                    <div className="big">{formatKcal(burned)} <span className="sub">{S.kcal}</span></div>
-                    <div className="sub">{S.estimate}</div>
-                  </div>
-                )}
-                {kcal && burned != null && (
-                  <div>
-                    <h2>{S.difference}</h2>
-                    <div className="big">{formatKcal(kcal.value - burned)} <span className="sub">{S.kcal}</span></div>
-                    <div className="sub">{S.differenceNote}</div>
-                  </div>
-                )}
-              </div>
+          {day?.weight_kg != null && (
+            <button className="card weight-line" onClick={edit}>
+              <h2 style={{ margin: 0 }}><Icon name="scale" size={16} />{S.weight}</h2>
+              <span className="big">{formatKg(day.weight_kg)} <span className="sub">{S.kg}</span></span>
+              {diff != null && previous && (
+                <span className="sub">{S.changeVs(`${diff > 0 ? '+' : ''}${diff.toFixed(1)}`, formatShort(previous.date))}</span>
+              )}
             </button>
+          )}
+
+          {(bundle.meals.length > 0 || burned != null) && (
+            <CalorieCard meals={bundle.meals} burned={burned} goal={settings.kcal_target} onClick={edit} />
           )}
 
           {bundle.activities.length > 0 && (
@@ -131,6 +109,17 @@ export default function Today() {
               <ul className="list">
                 {bundle.activities.map((a) => (
                   <li key={a.id}><button className="item" onClick={edit}><ActivitySummary activity={a} /></button></li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {bundle.bp.length > 0 && (
+            <div className="card">
+              <h2><Icon name="heart" size={16} />{S.bp.title}</h2>
+              <ul className="list">
+                {bundle.bp.map((r) => (
+                  <li key={r.id}><button className="item" onClick={() => nav(`/bp/${r.id}`)}><BpSummary reading={r} /></button></li>
                 ))}
               </ul>
             </div>

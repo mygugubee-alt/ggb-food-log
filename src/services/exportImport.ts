@@ -2,7 +2,7 @@ import { Unzip, UnzipInflate, Zip, ZipDeflate, ZipPassThrough, strFromU8, strToU
 import { db } from '../db/db'
 import { getProfilePhoto, getSettings, hardDeleteDay, hasAnyData, listA1c, loadAll, setProfilePhoto, setSetting, uuid } from '../db/repo'
 import {
-  MEAL_TYPES, SUGAR_CONTEXTS, type A1cResult, type Activity, type DayEntry, type GoalChange, type Meal, type Photo, type Reading, type Settings,
+  MEAL_TYPES, SUGAR_CONTEXTS, type A1cResult, type Activity, type BpReading, type DayEntry, type GoalChange, type Meal, type Photo, type Reading, type Settings,
 } from '../models/types'
 import { isValidDate, todayKL } from '../utils/dates'
 import { isThemeName } from '../theme/themes'
@@ -18,11 +18,12 @@ export type ExportReading = Omit<Reading, 'deleted_at'>
 export type ExportPhoto = Omit<Photo, 'deleted_at'> & { file: string } // photos/<photo id>.jpg
 export type ExportA1c = Omit<A1cResult, 'deleted_at'>
 export type ExportActivity = Omit<Activity, 'deleted_at'>
+export type ExportBp = Omit<BpReading, 'deleted_at'>
 export interface ExportFile {
   schema_version: number
   app: 'food-log'
   exported_at: string
-  settings: Pick<Settings, 'sugar_unit' | 'week_start' | 'hide_sugar'> & Partial<Pick<Settings, 'theme' | 'range_mode' | 'custom_before_max' | 'custom_after_max'>>
+  settings: Pick<Settings, 'sugar_unit' | 'week_start' | 'hide_sugar'> & Partial<Pick<Settings, 'theme' | 'range_mode' | 'custom_before_max' | 'custom_after_max' | 'height_cm' | 'kcal_target'>>
   days: ExportDay[]
   meals: ExportMeal[]
   readings: ExportReading[]
@@ -32,6 +33,8 @@ export interface ExportFile {
   a1c_results?: ExportA1c[]
   /** Activities. Optional for the same reason. */
   activities?: ExportActivity[]
+  /** Blood pressure readings. Optional for the same reason. */
+  bp_readings?: ExportBp[]
 }
 
 export const exportFileName = (): string => `foodlog-export-${todayKL()}.zip`
@@ -52,6 +55,8 @@ export async function collectExportData(): Promise<ExportFile> {
     exported_at: new Date().toISOString(),
     settings: { sugar_unit: settings.sugar_unit, week_start: settings.week_start, hide_sugar: settings.hide_sugar, theme: settings.theme,
       range_mode: settings.range_mode, custom_before_max: settings.custom_before_max, custom_after_max: settings.custom_after_max,
+      height_cm: settings.height_cm,
+      kcal_target: settings.kcal_target,
     },
     days: all.days.map(strip),
     meals: all.meals.map(strip),
@@ -60,6 +65,7 @@ export async function collectExportData(): Promise<ExportFile> {
     photos: all.photos.filter((p) => hasImage.has(p.id)).map((p) => ({ ...strip(p), file: `photos/${p.id}.jpg` })),
     a1c_results: (await listA1c()).map(strip),
     activities: all.activities.map(strip),
+    bp_readings: all.bp.map(strip),
   }
 }
 
@@ -193,6 +199,12 @@ export function validateExport(raw: unknown): ExportFile {
       if (!isStr(a.activity_type) || !isStr(a.name) || !isNum(a.minutes) || !numOrNull(a.kcal)) return bad('an activity has a wrong field')
     }
   }
+  if (raw.bp_readings !== undefined) {
+    for (const r of list('bp_readings')) {
+      if (!isStr(r.day_id) || !dayIds.has(r.day_id)) return bad('a blood pressure reading has no day')
+      if (!isStr(r.measured_at) || Number.isNaN(Date.parse(r.measured_at)) || !isNum(r.systolic) || !isNum(r.diastolic) || !numOrNull(r.pulse)) return bad('a blood pressure reading has a wrong field')
+    }
+  }
   if (raw.a1c_results !== undefined) {
     for (const a of list('a1c_results')) {
       if (!isStr(a.test_date) || !isValidDate(a.test_date) || !isNum(a.value_percent) || !isStr(a.note)) return bad('an HbA1c result has a wrong field')
@@ -262,6 +274,7 @@ export async function runImport(file: Blob, plan: ImportPlan, mode: 'skip' | 're
       await db.meals.bulkAdd(meals.map((m) => ({ ...m, id: mealId.get(m.id)!, day_id: dayId.get(m.day_id)!, deleted_at: null })))
       await db.readings.bulkAdd(readings.map((r) => ({ ...r, id: uuid(), day_id: dayId.get(r.day_id)!, deleted_at: null })))
       await db.activities.bulkAdd((data.activities ?? []).filter((a) => dayId.has(a.day_id)).map((a) => ({ ...a, kcal_auto: a.kcal_auto === true, id: uuid(), day_id: dayId.get(a.day_id)!, deleted_at: null })))
+      await db.bp.bulkAdd((data.bp_readings ?? []).filter((r) => dayId.has(r.day_id)).map((r) => ({ ...r, id: uuid(), day_id: dayId.get(r.day_id)!, deleted_at: null })))
       await db.photos.bulkAdd(
         photos.filter((p) => stagedSet.has(photoIdByFile.get(p.file)!)).map(({ file: f, ...p }) => ({
           ...p, id: photoIdByFile.get(f)!, day_id: dayId.get(p.day_id)!,
@@ -282,6 +295,8 @@ export async function runImport(file: Blob, plan: ImportPlan, mode: 'skip' | 're
         if (rm === 'off' || rm === 'general' || rm === 'diabetes' || rm === 'custom') await setSetting('range_mode', rm)
         if (isNum(data.settings.custom_before_max)) await setSetting('custom_before_max', data.settings.custom_before_max)
         if (isNum(data.settings.custom_after_max)) await setSetting('custom_after_max', data.settings.custom_after_max)
+        if (isNum(data.settings.height_cm) && data.settings.height_cm >= 100 && data.settings.height_cm <= 250) await setSetting('height_cm', data.settings.height_cm)
+        if (isNum(data.settings.kcal_target) && data.settings.kcal_target >= 800 && data.settings.kcal_target <= 5000) await setSetting('kcal_target', Math.round(data.settings.kcal_target))
       }
       // Like settings, the profile photo only comes along into an empty install.
       if (wasEmpty && profile) {

@@ -9,7 +9,7 @@ import { formatKcal, formatKg, parseWeight } from '../utils/units'
 import { useSettings } from '../components/hooks'
 import { Icon } from '../components/icons'
 import { PhotoButtons, Thumb } from '../components/photos'
-import { ActivitySummary, MealSummary, ReadingSummary } from '../components/rows'
+import { ActivitySummary, BpSummary, MealSummary, ReadingSummary } from '../components/rows'
 import { errorMessage, goBack, Field, Page, useDelete, useUI } from '../components/ui'
 
 /** A field that saves when it loses focus and shows a small "Saved" mark. */
@@ -110,6 +110,18 @@ function Editor({ date }: { date: string }) {
           </ul>
         )}
         <button className="btn block" style={{ marginTop: 8 }} onClick={() => nav(`/activity/new?date=${date}`)}>+ {S.act.add}</button>
+      </div>
+
+      <div className="card">
+        <h2><Icon name="heart" size={16} />{S.bp.title}</h2>
+        {bundle.bp.length === 0 ? <p className="muted">{S.bp.noneToday}</p> : (
+          <ul className="list">
+            {bundle.bp.map((r) => (
+              <li key={r.id}><button className="item" onClick={() => nav(`/bp/${r.id}`)}><BpSummary reading={r} /><span className="chev"><Icon name="chevron" size={18} /></span></button></li>
+            ))}
+          </ul>
+        )}
+        <button className="btn block" style={{ marginTop: 8 }} onClick={() => nav(`/bp/new?date=${date}`)}>{S.bp.add}</button>
       </div>
 
       <div className="card">

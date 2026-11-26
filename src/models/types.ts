@@ -63,6 +63,19 @@ export interface Reading {
   deleted_at: string | null
 }
 
+/** One blood pressure reading. */
+export interface BpReading {
+  id: string
+  day_id: string
+  measured_at: string // UTC
+  systolic: number // mmHg
+  diastolic: number // mmHg
+  pulse: number | null // beats per minute
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
 /** One activity in a day, with the calories it is estimated to have burned. */
 export interface Activity {
   id: string
@@ -105,6 +118,10 @@ export interface Settings {
   /** Own targets in mmol/L, used when range_mode is 'custom'. */
   custom_before_max: number
   custom_after_max: number
+  /** Height in cm for BMI; null = not set. */
+  height_cm: number | null
+  /** Daily calorie goal in kcal; null = not set. */
+  kcal_target: number | null
   last_export_at: string | null
   first_use_at: string | null
 }
@@ -117,6 +134,8 @@ export const DEFAULT_SETTINGS: Settings = {
   range_mode: 'general',
   custom_before_max: 7.0,
   custom_after_max: 10.0,
+  height_cm: null,
+  kcal_target: null,
   last_export_at: null,
   first_use_at: null,
 }
@@ -130,4 +149,5 @@ export interface DayBundle {
   readings: Reading[]
   photos: Photo[]
   activities: Activity[]
+  bp: BpReading[]
 }

@@ -7,6 +7,7 @@ import { classify, customTargets } from '../services/ranges'
 import { S } from '../strings/en'
 import { formatDate, isValidDate, isValidTime, klParts, nowTimeKL, todayKL } from '../utils/dates'
 import { checkSugar, displayReading, parseSugarInput, toMmol, unitLabel } from '../utils/units'
+import { parseSugarScan } from '../utils/sugarScan'
 import { useSettings } from '../components/hooks'
 import { Chips, Field, goBack, Page, useDelete, useUI } from '../components/ui'
 
@@ -29,6 +30,8 @@ export default function SugarEntry() {
   /** For an existing reading: the value text as first shown. If unchanged, the typed value stays untouched. */
   const shownValue = useRef<string | null>(null)
   const valueInput = useRef<HTMLInputElement>(null)
+  const [scan, setScan] = useState('')
+  const [scanMsg, setScanMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const blank = (date: string): Draft => ({ date, value: '', context: null, time: date === todayKL() ? nowTimeKL() : '', note: '' })
 
@@ -68,6 +71,17 @@ export default function SugarEntry() {
     if (!dirty || (await ui.confirm(S.discardConfirm, S.discard, true))) goBack(nav)
   }
 
+  /** Fills the value from scanned (or typed) text. */
+  const onScan = (text: string) => {
+    setScan(text)
+    if (text.trim() === '') { setScanMsg(null); return }
+    const r = parseSugarScan(text, unit)
+    if (!r) { setScanMsg({ ok: false, text: S.sugarScan.none }); return }
+    set({ value: r.text })
+    setErrors({})
+    setScanMsg({ ok: true, text: r.guessedPoint ? S.sugarScan.guessed(r.text, unitLabel(unit)) : S.sugarScan.found(r.text, unitLabel(unit)) })
+  }
+
   const save = async (another: boolean) => {
     const problems: { value?: string; time?: string } = {}
     const unchanged = !isNew && draft.value.trim() === shownValue.current
@@ -99,6 +113,8 @@ export default function SugarEntry() {
       initial.current = fingerprint(d)
       setDraft(d)
       ui.toast(S.readingSaved)
+      setScan('')
+      setScanMsg(null)
       valueInput.current?.focus()
     } else {
       goBack(nav)
@@ -108,11 +124,22 @@ export default function SugarEntry() {
   return (
     <Page title={isNew ? S.newReading : S.editReading} back={() => { void cancel() }}>
       <p className="sub">{formatDate(draft.date)}</p>
+      {isNew && (
+        <div className="card stack">
+          <Field label={S.sugarScan.label} htmlFor="sugar-scan">
+            {/* Plain text box: the iPhone keyboard offers Scan Text for text, not number pads. */}
+            <textarea id="sugar-scan" className="input" rows={1} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+              placeholder={S.sugarScan.placeholder} value={scan} onChange={(e) => onScan(e.target.value)} />
+          </Field>
+          {scanMsg && <div className={scanMsg.ok ? 'notice' : 'error'} role="status">{scanMsg.text}</div>}
+          <p className="muted" style={{ margin: 0 }}>{S.sugarScan.help}</p>
+        </div>
+      )}
       <div className="card stack">
         <Field label={S.value} htmlFor="sugar-value" error={errors.value}>
           <div className="input-row">
             <input id="sugar-value" ref={valueInput} className="input" inputMode={unit === 'mmol_l' ? 'decimal' : 'numeric'} autoComplete="off"
-              autoFocus={isNew} value={draft.value} onChange={(e) => set({ value: e.target.value })} aria-describedby="sugar-unit" />
+              value={draft.value} onChange={(e) => set({ value: e.target.value })} aria-describedby="sugar-unit" />
             <strong id="sugar-unit" style={{ whiteSpace: 'nowrap' }}>{unitLabel(unit)}</strong>
           </div>
         </Field>

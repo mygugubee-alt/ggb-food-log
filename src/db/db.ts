@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import type { A1cResult, Activity, DayEntry, GoalChange, Meal, Photo, PhotoImage, PhotoThumb, Reading } from '../models/types'
+import type { A1cResult, Activity, BpReading, DayEntry, GoalChange, Meal, Photo, PhotoImage, PhotoThumb, Reading } from '../models/types'
 
 export interface SettingRow { key: string; value: unknown }
 
@@ -14,6 +14,7 @@ export class FoodLogDB extends Dexie {
   goalChanges!: Table<GoalChange, string>
   a1c!: Table<A1cResult, string>
   activities!: Table<Activity, string>
+  bp!: Table<BpReading, string>
   settings!: Table<SettingRow, string>
 
   constructor() {
@@ -32,6 +33,8 @@ export class FoodLogDB extends Dexie {
     this.version(2).stores({ a1c: 'id, test_date' })
     // v3: activities with estimated calories burned.
     this.version(3).stores({ activities: 'id, day_id' })
+    // v4: blood pressure readings.
+    this.version(4).stores({ bp: 'id, day_id, measured_at' })
   }
 }
 

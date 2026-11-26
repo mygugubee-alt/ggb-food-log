@@ -1,13 +1,15 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useNavigate } from 'react-router-dom'
 import { currentGoal, latestWeight } from '../db/repo'
-import type { Activity, Meal, Photo, Reading, Settings } from '../models/types'
-import { levelOf, type Level } from '../services/ranges'
+import type { Activity, BpReading, Meal, Photo, Reading, Settings } from '../models/types'
+import { BP_TONE, bpBand, levelOf, type Level } from '../services/ranges'
+import { BMI_EDGES, bmi, bmiBand, bmiPosition, type BmiBand } from '../services/bmi'
 import { S } from '../strings/en'
 import { formatShort, klParts } from '../utils/dates'
 import { displayReading, formatKcal, formatKg, roundTo, unitLabel } from '../utils/units'
 import { Badge, Icon } from './icons'
 import { Thumb } from './photos'
+import { useSettings } from './hooks'
 
 export const mealTitle = (m: Meal): string => `${S.mealType[m.meal_type]}${m.time ? ` · ${m.time}` : ''}`
 
@@ -54,6 +56,23 @@ export function ReadingSummary({ reading, settings }: { reading: Reading; settin
   )
 }
 
+export function BpSummary({ reading }: { reading: BpReading }) {
+  const band = bpBand(reading.systolic, reading.diastolic)
+  const tone = BP_TONE[band]
+  return (
+    <>
+      <Badge name="heart" tone="warm" />
+      <div className="grow" aria-label={S.bp.aria(reading.systolic, reading.diastolic, reading.pulse, S.bp.band[band])}>
+        <div className="spread">
+          <span><strong className={`num lvl-${tone}`}>{reading.systolic}/{reading.diastolic}</strong> <span className="sub">{S.bp.mmHg}</span></span>
+          <span className={`level lvl-bg-${tone}`}>{S.bp.band[band]}</span>
+        </div>
+        <div className="sub">{klParts(reading.measured_at).time}{reading.pulse != null && ` · ${S.bp.pulse} ${reading.pulse}${S.bp.perMin}`}</div>
+      </div>
+    </>
+  )
+}
+
 export function ActivitySummary({ activity }: { activity: Activity }) {
   return (
     <>
@@ -77,35 +96,78 @@ export function goalDifference(latest: number, goal: number): string {
   return S.atGoal
 }
 
+const BANDS: BmiBand[] = ['under', 'healthy', 'over', 'obese']
+
+/** Four equal coloured bands with the band edges above and a bubble pointing at this BMI. */
+function BmiBar({ value, band }: { value: number; band: BmiBand }) {
+  const pos = bmiPosition(value) * 100
+  return (
+    <div className="bmi" role="img" aria-label={S.bmiAria(value.toFixed(1), S.bmiBand[band])}>
+      <div className="bmi-head"><span className="hero-small">{S.bmiLabel}</span></div>
+      <div className="bmi-scale">
+        <div className="bmi-bubble" style={{ left: `clamp(22px, ${pos}%, calc(100% - 22px))` }}>{value.toFixed(1)}</div>
+        <div className="bmi-pin" style={{ left: `${pos}%` }} />
+        {BMI_EDGES.slice(1, 4).map((e, i) => Math.abs((i + 1) * 25 - pos) < 9 ? null : <span key={e} className="bmi-edge" style={{ left: `${(i + 1) * 25}%` }}>{e.toFixed(1)}</span>)}
+        <div className="bmi-bar">{BANDS.map((b) => <span key={b} className={`bmi-seg seg-${b}`} />)}</div>
+      </div>
+      <div className="bmi-names">{BANDS.map((b) => <span key={b} className={b === band ? 'on' : ''}>{S.bmiShort[b]}</span>)}</div>
+    </div>
+  )
+}
+
 export function GoalCard() {
   const nav = useNavigate()
+  const settings = useSettings()
   const data = useLiveQuery(async () => ({ goal: await currentGoal(), latest: await latestWeight('9999-12-31', true) }))
-  if (!data) return <div className="hero" aria-hidden="true">&nbsp;</div>
+  if (!data || !settings) return <div className="hero" aria-hidden="true">&nbsp;</div>
   const { goal, latest } = data
+  const height = settings.height_cm
+  const value = latest && height ? bmi(latest.weight_kg, height) : null
+  const band = value != null ? bmiBand(value) : null
+  const diff = latest && goal != null ? roundTo(latest.weight_kg - goal, 1) : null
   return (
     <button className="hero" onClick={() => nav('/goal')}>
-      {goal == null ? (
-        <div className="spread">
-          <span className="hero-title">{S.setGoalPrompt}</span>
-          <Icon name="chevron" />
-        </div>
+      <div className="spread">
+        <span className="hero-label">{S.weightCardTitle}</span>
+        <Icon name="chevron" size={18} />
+      </div>
+      {latest ? (
+        <div className="hero-number">{formatKg(latest.weight_kg)}<span className="hero-unit"> {S.kg}</span></div>
       ) : (
-        <>
-          <div className="spread">
-            <span className="hero-label">{S.goalTitle}</span>
-            <Icon name="chevron" size={18} />
-          </div>
-          <div className="hero-number" aria-label={S.dreamWeight(formatKg(goal))}>
-            {formatKg(goal)}<span className="hero-unit"> {S.kg}</span>
-          </div>
-          {latest && (
-            <div className="hero-foot">
-              <span>{S.latestWeight(formatKg(latest.weight_kg), formatShort(latest.date))}</span>
-              <span className="hero-pill">{goalDifference(latest.weight_kg, goal)}</span>
-            </div>
-          )}
-        </>
+        <div className="hero-title" style={{ marginTop: 6 }}>{S.noWeightYet}</div>
       )}
+
+      {goal == null ? (
+        <div className="hero-foot"><span className="hero-pill">{S.setGoalPrompt}</span></div>
+      ) : (
+        <div className="hero-track" aria-label={latest ? `${S.dreamWeight(formatKg(goal))}. ${goalDifference(latest.weight_kg, goal)}` : S.dreamWeight(formatKg(goal))}>
+          <div className="hero-end">
+            <span className="hero-small">{S.dreamLabel}</span>
+            <strong>{formatKg(goal)} {S.kg}</strong>
+          </div>
+          {latest && diff != null && (
+            <>
+              <div className="hero-arrow" aria-hidden="true">
+                <span>{diff === 0 ? S.atGoalShort : S.toGo(Math.abs(diff).toFixed(1))}</span>
+                <svg viewBox="0 0 100 10" preserveAspectRatio="none">
+                  {diff > 0 && <path d="M1 5h98M1 5l6-4M1 5l6 4" />}
+                  {diff < 0 && <path d="M1 5h98M99 5l-6-4M99 5l-6 4" />}
+                  {diff === 0 && <path d="M1 5h98" />}
+                </svg>
+              </div>
+              <div className="hero-end right">
+                <span className="hero-small">{S.latestLabel}</span>
+                <strong>{formatKg(latest.weight_kg)} {S.kg}</strong>
+                <span className="hero-small">({formatShort(latest.date)})</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {latest && (value != null && band ? <BmiBar value={value} band={band} /> : (
+        <div className="hero-foot"><span className="hero-small">{S.bmiNeedsHeight}</span></div>
+      ))}
     </button>
   )
 }

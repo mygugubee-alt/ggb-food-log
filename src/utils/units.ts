@@ -69,3 +69,19 @@ export function parseA1c(text: string): number | null {
 
 export const formatKg = (n: number): string => roundTo(n, 1).toFixed(1)
 export const formatKcal = (n: number): string => roundTo(n, 0).toLocaleString('en-US')
+
+/** Height in cm: 100.0–250.0, at most one decimal place. */
+export function parseHeight(text: string): number | null {
+  const t = text.trim().replace(',', '.')
+  if (!/^\d{2,3}(\.\d)?$/.test(t)) return null
+  const v = Number(t)
+  return v >= 100 && v <= 250 ? v : null
+}
+
+/** Daily calorie goal: whole number 800–5000. */
+export function parseKcalTarget(text: string): number | null {
+  const t = text.trim().replace(/[ ,]/g, '')
+  if (!/^\d{3,4}$/.test(t)) return null
+  const v = Number(t)
+  return v >= 800 && v <= 5000 ? v : null
+}

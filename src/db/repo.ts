@@ -1,6 +1,6 @@
 import { db } from './db'
 import {
-  DEFAULT_SETTINGS, type A1cResult, type Activity, type DayBundle, type DayEntry, type GoalChange, type Meal, type MealType, type NewPhoto,
+  DEFAULT_SETTINGS, type A1cResult, type Activity, type BpReading, type DayBundle, type DayEntry, type GoalChange, type Meal, type MealType, type NewPhoto,
   type Photo, type Reading, type Settings, type SugarContext, type SugarUnit,
 } from '../models/types'
 import { klToUtcIso, todayKL } from '../utils/dates'
@@ -18,7 +18,7 @@ export function uuid(): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
 }
 
-const DATA_TABLES = () => [db.days, db.meals, db.photos, db.images, db.thumbs, db.readings, db.a1c, db.activities]
+const DATA_TABLES = () => [db.days, db.meals, db.photos, db.images, db.thumbs, db.readings, db.a1c, db.activities, db.bp]
 /** Every multi-table change runs in one transaction. */
 const tx = <R>(fn: () => Promise<R>): Promise<R> => db.transaction('rw', DATA_TABLES(), fn)
 
@@ -39,6 +39,7 @@ export async function hardDeleteDay(dayId: string): Promise<void> {
   await db.meals.where('day_id').equals(dayId).delete()
   await db.readings.where('day_id').equals(dayId).delete()
   await db.activities.where('day_id').equals(dayId).delete()
+  await db.bp.where('day_id').equals(dayId).delete()
   await db.days.delete(dayId)
 }
 
@@ -71,7 +72,8 @@ async function cleanupEmptyDay(dayId: string): Promise<void> {
     (await db.meals.where('day_id').equals(dayId).count()) +
     (await db.readings.where('day_id').equals(dayId).count()) +
     (await db.photos.where('day_id').equals(dayId).count()) +
-    (await db.activities.where('day_id').equals(dayId).count())
+    (await db.activities.where('day_id').equals(dayId).count()) +
+    (await db.bp.where('day_id').equals(dayId).count())
   if (children === 0) await db.days.delete(dayId)
 }
 
@@ -89,10 +91,11 @@ const sortMeals = (m: Meal[]): Meal[] => m.sort((a, b) => a.sort_order - b.sort_
 const sortPhotos = (p: Photo[]): Photo[] => p.sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at))
 const sortActivities = (a: Activity[]): Activity[] => a.sort((x, y) => x.created_at.localeCompare(y.created_at))
 const sortReadings = (r: Reading[]): Reading[] => r.sort((a, b) => a.measured_at.localeCompare(b.measured_at))
+const sortBp = (r: BpReading[]): BpReading[] => r.sort((a, b) => a.measured_at.localeCompare(b.measured_at))
 
 export async function loadDayBundle(date: string): Promise<DayBundle> {
   const day = await getDay(date)
-  if (!day) return { day: null, meals: [], readings: [], photos: [], activities: [] }
+  if (!day) return { day: null, meals: [], readings: [], photos: [], activities: [], bp: [] }
   const [meals, readings, photos] = await Promise.all([
     db.meals.where('day_id').equals(day.id).toArray(),
     db.readings.where('day_id').equals(day.id).toArray(),
@@ -101,9 +104,11 @@ export async function loadDayBundle(date: string): Promise<DayBundle> {
   const liveMeals = sortMeals(live(meals))
   const mealIds = new Set(liveMeals.map((m) => m.id))
   const activities = sortActivities(live(await db.activities.where('day_id').equals(day.id).toArray()))
+  const bp = sortBp(live(await db.bp.where('day_id').equals(day.id).toArray()))
   return {
     day,
     activities,
+    bp,
     meals: liveMeals,
     readings: sortReadings(live(readings)),
     photos: sortPhotos(live(photos).filter((p) => p.meal_id == null || mealIds.has(p.meal_id))),
@@ -111,11 +116,11 @@ export async function loadDayBundle(date: string): Promise<DayBundle> {
 }
 
 export const isLogged = (b: DayBundle): boolean =>
-  !!b.day && (dayHasOwnContent(b.day) || b.meals.length > 0 || b.readings.length > 0 || b.photos.length > 0 || b.activities.length > 0)
+  !!b.day && (dayHasOwnContent(b.day) || b.meals.length > 0 || b.readings.length > 0 || b.photos.length > 0 || b.activities.length > 0 || b.bp.length > 0)
 
-export interface RangeData { days: DayEntry[]; meals: Meal[]; readings: Reading[]; photos: Photo[]; activities: Activity[] }
+export interface RangeData { days: DayEntry[]; meals: Meal[]; readings: Reading[]; photos: Photo[]; activities: Activity[]; bp: BpReading[] }
 
-function tidy(days: DayEntry[], meals: Meal[], readings: Reading[], photos: Photo[], activities: Activity[]): RangeData {
+function tidy(days: DayEntry[], meals: Meal[], readings: Reading[], photos: Photo[], activities: Activity[], bp: BpReading[]): RangeData {
   const liveDays = live(days).sort((a, b) => a.date.localeCompare(b.date))
   const dayIds = new Set(liveDays.map((d) => d.id))
   const liveMeals = sortMeals(live(meals).filter((m) => dayIds.has(m.day_id)))
@@ -126,6 +131,7 @@ function tidy(days: DayEntry[], meals: Meal[], readings: Reading[], photos: Phot
     readings: sortReadings(live(readings).filter((r) => dayIds.has(r.day_id))),
     photos: sortPhotos(live(photos).filter((p) => dayIds.has(p.day_id) && (p.meal_id == null || mealIds.has(p.meal_id)))),
     activities: sortActivities(live(activities).filter((a) => dayIds.has(a.day_id))),
+    bp: sortBp(live(bp).filter((r) => dayIds.has(r.day_id))),
   }
 }
 
@@ -133,21 +139,22 @@ function tidy(days: DayEntry[], meals: Meal[], readings: Reading[], photos: Phot
 export async function loadRange(from: string, to: string): Promise<RangeData> {
   const days = await db.days.where('date').between(from, to, true, true).toArray()
   const ids = days.map((d) => d.id)
-  const [meals, readings, photos, activities] = await Promise.all([
+  const [meals, readings, photos, activities, bp] = await Promise.all([
     db.meals.where('day_id').anyOf(ids).toArray(),
     db.readings.where('day_id').anyOf(ids).toArray(),
     db.photos.where('day_id').anyOf(ids).toArray(),
     db.activities.where('day_id').anyOf(ids).toArray(),
+    db.bp.where('day_id').anyOf(ids).toArray(),
   ])
-  return tidy(days, meals, readings, photos, activities)
+  return tidy(days, meals, readings, photos, activities, bp)
 }
 
 /** Every live row. No image data. */
 export async function loadAll(): Promise<RangeData> {
-  const [days, meals, readings, photos, activities] = await Promise.all([
-    db.days.toArray(), db.meals.toArray(), db.readings.toArray(), db.photos.toArray(), db.activities.toArray(),
+  const [days, meals, readings, photos, activities, bp] = await Promise.all([
+    db.days.toArray(), db.meals.toArray(), db.readings.toArray(), db.photos.toArray(), db.activities.toArray(), db.bp.toArray(),
   ])
-  return tidy(days, meals, readings, photos, activities)
+  return tidy(days, meals, readings, photos, activities, bp)
 }
 
 export interface WeightPoint { date: string; weight_kg: number }
@@ -289,9 +296,39 @@ export function saveReading(input: ReadingInput): Promise<string> {
   })
 }
 
+// ---------- Blood pressure ----------
+
+export interface BpInput {
+  id?: string
+  date: string
+  time: string // HH:mm, Malaysia time
+  systolic: number
+  diastolic: number
+  pulse: number | null
+}
+
+export function saveBp(input: BpInput): Promise<string> {
+  return tx(async () => {
+    const t = nowIso()
+    const fields = { measured_at: klToUtcIso(input.date, input.time), systolic: input.systolic, diastolic: input.diastolic, pulse: input.pulse, updated_at: t }
+    if (input.id) {
+      const existing = await db.bp.get(input.id)
+      if (!existing) throw new Error('Reading not found')
+      const day = await ensureDay(input.date)
+      await db.bp.update(input.id, { ...fields, day_id: day.id })
+      if (existing.day_id !== day.id) await cleanupEmptyDay(existing.day_id)
+      return input.id
+    }
+    const day = await ensureDay(input.date)
+    const id = uuid()
+    await db.bp.add({ id, day_id: day.id, ...fields, created_at: t, deleted_at: null })
+    return id
+  })
+}
+
 // ---------- Deleting and Undo ----------
 
-export type DeleteKind = 'day' | 'meal' | 'reading' | 'photo' | 'a1c' | 'activity'
+export type DeleteKind = 'day' | 'meal' | 'reading' | 'photo' | 'a1c' | 'activity' | 'bp'
 
 /** Marks a row and everything under it as deleted. Returns the stamp that Undo uses. */
 export function softDelete(kind: DeleteKind, id: string): Promise<string> {
@@ -303,6 +340,7 @@ export function softDelete(kind: DeleteKind, id: string): Promise<string> {
     if (kind === 'reading') await db.readings.update(id, mark)
     if (kind === 'a1c') await db.a1c.update(id, mark)
     if (kind === 'activity') await db.activities.update(id, mark)
+    if (kind === 'bp') await db.bp.update(id, mark)
     if (kind === 'meal') {
       await db.meals.update(id, mark)
       await db.photos.where('meal_id').equals(id).filter(isLive).modify(mark)
@@ -312,6 +350,7 @@ export function softDelete(kind: DeleteKind, id: string): Promise<string> {
       await db.meals.where('day_id').equals(id).filter(isLive).modify(mark)
       await db.readings.where('day_id').equals(id).filter(isLive).modify(mark)
       await db.activities.where('day_id').equals(id).filter(isLive).modify(mark)
+      await db.bp.where('day_id').equals(id).filter(isLive).modify(mark)
       await db.photos.where('day_id').equals(id).filter(isLive).modify(mark)
     }
     return stamp
@@ -329,6 +368,7 @@ export function restore(stamp: string): Promise<void> {
     await db.photos.filter(match).modify(back)
     await db.a1c.filter(match).modify(back)
     await db.activities.filter(match).modify(back)
+    await db.bp.filter(match).modify(back)
   })
 }
 
@@ -355,6 +395,9 @@ export function purge(stamp?: string): Promise<void> {
     const acts = await db.activities.filter(match).toArray()
     acts.forEach((a) => touched.add(a.day_id))
     await db.activities.bulkDelete(acts.map((a) => a.id))
+    const bps = await db.bp.filter(match).toArray()
+    bps.forEach((r) => touched.add(r.day_id))
+    await db.bp.bulkDelete(bps.map((r) => r.id))
     await db.a1c.bulkDelete(await db.a1c.filter(match).primaryKeys())
     if (!stamp) {
       // Image data with no photo row (for example from an interrupted import).

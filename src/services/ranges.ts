@@ -68,3 +68,30 @@ export const A1C_TONE: Record<A1cBand, Level> = { normal: 'in_range', prediabete
 
 /** Percent (NGSP) to mmol/mol (IFCC), the unit many labs report. */
 export const a1cToMmolMol = (percent: number): number => Math.round((percent - 2.15) * 10.929)
+
+// ---------- Blood pressure ----------
+
+// Malaysian Clinical Practice Guidelines, Management of Hypertension (5th ed., 2018),
+// in mmHg. A reading takes the higher band of its two numbers. Low is a common
+// reference point (under 90 / 60), not part of the guideline's table.
+export type BpBand = 'low' | 'optimal' | 'normal' | 'high_normal' | 'stage1' | 'stage2' | 'stage3'
+export const BP_BANDS: { band: BpBand; sys: number; dia: number }[] = [
+  // lowest value of each band, from the top
+  { band: 'stage3', sys: 180, dia: 110 },
+  { band: 'stage2', sys: 160, dia: 100 },
+  { band: 'stage1', sys: 140, dia: 90 },
+  { band: 'high_normal', sys: 130, dia: 85 },
+  { band: 'normal', sys: 120, dia: 80 },
+]
+export const BP_LOW = { sys: 90, dia: 60 }
+
+export function bpBand(systolic: number, diastolic: number): BpBand {
+  for (const b of BP_BANDS) if (systolic >= b.sys || diastolic >= b.dia) return b.band
+  if (systolic < BP_LOW.sys || diastolic < BP_LOW.dia) return 'low'
+  return 'optimal'
+}
+
+/** The colour a band shares with the blood sugar levels. */
+export const BP_TONE: Record<BpBand, Level> = {
+  low: 'low', optimal: 'in_range', normal: 'in_range', high_normal: 'above', stage1: 'high', stage2: 'high', stage3: 'high',
+}

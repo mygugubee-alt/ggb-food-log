@@ -17,6 +17,7 @@ import Report from './screens/Report'
 import Search from './screens/Search'
 import Settings from './screens/Settings'
 import SugarEntry from './screens/SugarEntry'
+import BpEntry from './screens/BpEntry'
 import Timeline from './screens/Timeline'
 import Today from './screens/Today'
 import { S } from './strings/en'
@@ -129,6 +130,7 @@ function Shell() {
         <Route path="/day/:date" element={<DayEditor />} />
         <Route path="/meal/:id" element={<MealEditor />} />
         <Route path="/sugar/:id" element={<SugarEntry />} />
+        <Route path="/bp/:id" element={<BpEntry />} />
         <Route path="/goal" element={<Goal />} />
         <Route path="/a1c" element={<A1c />} />
         <Route path="/activity/:id" element={<ActivityEditor />} />

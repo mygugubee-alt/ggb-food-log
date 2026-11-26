@@ -69,3 +69,21 @@ describe('blood sugar ranges', () => {
     expect(classify(9.0, 'after_meal', 'custom', own)).toBe('above')
   })
 })
+
+import { bpBand } from '../src/services/ranges'
+describe('blood pressure bands (Malaysian CPG 2018)', () => {
+  it('uses the higher band of the two numbers', () => {
+    expect(bpBand(115, 75)).toBe('optimal')
+    expect(bpBand(121, 84)).toBe('normal')
+    expect(bpBand(118, 85)).toBe('high_normal')
+    expect(bpBand(139, 70)).toBe('high_normal')
+    expect(bpBand(140, 80)).toBe('stage1')
+    expect(bpBand(125, 100)).toBe('stage2')
+    expect(bpBand(180, 90)).toBe('stage3')
+  })
+  it('flags low readings', () => {
+    expect(bpBand(88, 58)).toBe('low')
+    expect(bpBand(95, 58)).toBe('low')
+    expect(bpBand(90, 60)).toBe('optimal')
+  })
+})

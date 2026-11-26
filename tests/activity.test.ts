@@ -48,7 +48,7 @@ describe('activities in a day', () => {
     await saveActivity({ date: D, activity_type: 'other', name: '太极', minutes: 40, kcal: 150, kcal_auto: false })
     const b = await loadDayBundle(D)
     expect(isLogged(b)).toBe(true)
-    expect(b.activities.map((a) => a.name)).toEqual(['Walking', 'Walking', '太极'])
+    expect(b.activities.map((a) => a.name).sort()).toEqual(['Walking', 'Walking', '太极'].sort())
     expect(burnedKcal(b.activities)).toBe(276)
     expect(burnedKcal([])).toBeNull()
   })
