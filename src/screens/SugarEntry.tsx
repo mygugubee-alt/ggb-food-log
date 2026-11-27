@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { db } from '../db/db'
 import { saveReading } from '../db/repo'
@@ -7,7 +7,8 @@ import { classify, customTargets } from '../services/ranges'
 import { S } from '../strings/en'
 import { formatDate, isValidDate, isValidTime, klParts, nowTimeKL, todayKL } from '../utils/dates'
 import { checkSugar, displayReading, parseSugarInput, toMmol, unitLabel } from '../utils/units'
-import { parseSugarScan } from '../utils/sugarScan'
+import { meterValue } from '../utils/sugarScan'
+import { readMeterPhoto } from '../services/photos'
 import { useSettings } from '../components/hooks'
 import { Chips, Field, goBack, Page, useDelete, useUI } from '../components/ui'
 
@@ -30,7 +31,7 @@ export default function SugarEntry() {
   /** For an existing reading: the value text as first shown. If unchanged, the typed value stays untouched. */
   const shownValue = useRef<string | null>(null)
   const valueInput = useRef<HTMLInputElement>(null)
-  const [scan, setScan] = useState('')
+  const [preview, setPreview] = useState<string | null>(null)
   const [scanMsg, setScanMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const blank = (date: string): Draft => ({ date, value: '', context: null, time: date === todayKL() ? nowTimeKL() : '', note: '' })
@@ -71,15 +72,24 @@ export default function SugarEntry() {
     if (!dirty || (await ui.confirm(S.discardConfirm, S.discard, true))) goBack(nav)
   }
 
-  /** Fills the value from scanned (or typed) text. */
-  const onScan = (text: string) => {
-    setScan(text)
-    if (text.trim() === '') { setScanMsg(null); return }
-    const r = parseSugarScan(text, unit)
+  /** Reads the value from a photo of the meter and fills the value field. */
+  const onPhoto = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const out = await ui.run(() => readMeterPhoto(file), S.sugarScan.reading)
+    if (!out) return
+    setPreview(out.preview)
+    const { digits, pointSeen } = out.result
+    const r = digits ? meterValue(digits, pointSeen, unit) : null
     if (!r) { setScanMsg({ ok: false, text: S.sugarScan.none }); return }
     set({ value: r.text })
     setErrors({})
-    setScanMsg({ ok: true, text: r.guessedPoint ? S.sugarScan.guessed(r.text, unitLabel(unit)) : S.sugarScan.found(r.text, unitLabel(unit)) })
+    setScanMsg({
+      ok: true,
+      text: r.converted ? S.sugarScan.converted(digits!, r.text)
+        : r.guessedPoint ? S.sugarScan.guessed(r.text, unitLabel(unit)) : S.sugarScan.found(r.text, unitLabel(unit)),
+    })
   }
 
   const save = async (another: boolean) => {
@@ -113,7 +123,7 @@ export default function SugarEntry() {
       initial.current = fingerprint(d)
       setDraft(d)
       ui.toast(S.readingSaved)
-      setScan('')
+      setPreview(null)
       setScanMsg(null)
       valueInput.current?.focus()
     } else {
@@ -126,11 +136,18 @@ export default function SugarEntry() {
       <p className="sub">{formatDate(draft.date)}</p>
       {isNew && (
         <div className="card stack">
-          <Field label={S.sugarScan.label} htmlFor="sugar-scan">
-            {/* Plain text box: the iPhone keyboard offers Scan Text for text, not number pads. */}
-            <textarea id="sugar-scan" className="input" rows={1} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
-              placeholder={S.sugarScan.placeholder} value={scan} onChange={(e) => onScan(e.target.value)} />
-          </Field>
+          <span className="label">{S.sugarScan.label}</span>
+          <div className="actions">
+            <label className="btn primary">
+              <input className="sr-only" type="file" accept="image/*" capture="environment" onChange={(e) => { void onPhoto(e) }} />
+              {S.bp.takePhoto}
+            </label>
+            <label className="btn">
+              <input className="sr-only" type="file" accept="image/*" onChange={(e) => { void onPhoto(e) }} />
+              {S.bp.choosePhoto}
+            </label>
+          </div>
+          {preview && <img className="bp-preview" src={preview} alt="" />}
           {scanMsg && <div className={scanMsg.ok ? 'notice' : 'error'} role="status">{scanMsg.text}</div>}
           <p className="muted" style={{ margin: 0 }}>{S.sugarScan.help}</p>
         </div>

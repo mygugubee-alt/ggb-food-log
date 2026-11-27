@@ -94,3 +94,28 @@ export async function readMonitorPhoto(file: Blob): Promise<{ result: import('./
   canvas.width = canvas.height = 0
   return { result, preview }
 }
+
+/** Reads the value on a blood sugar meter from a photo, on the phone. The photo is not kept. */
+export async function readMeterPhoto(file: Blob): Promise<{ result: import('./segReader').MeterResult; preview: string }> {
+  const { readMeter, toGray } = await import('./segReader')
+  const img = await loadImage(file)
+  const scale = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight))
+  const width = Math.max(1, Math.round(img.naturalWidth * scale))
+  const height = Math.max(1, Math.round(img.naturalHeight * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  if (!ctx) throw new Error('The photo could not be processed.')
+  ctx.drawImage(img, 0, 0, width, height)
+  const pixels = ctx.getImageData(0, 0, width, height)
+  const result = readMeter(toGray(pixels.data, width, height, 1000))
+  ctx.lineWidth = Math.max(2, width / 250)
+  ctx.strokeStyle = '#2bb673'
+  if (result.lcd) ctx.strokeRect(result.lcd.x, result.lcd.y, result.lcd.w, result.lcd.h)
+  ctx.strokeStyle = '#ff7a00'
+  if (result.row) ctx.strokeRect(result.row.x, result.row.y, result.row.w, result.row.h)
+  const preview = canvas.toDataURL('image/jpeg', 0.7)
+  canvas.width = canvas.height = 0
+  return { result, preview }
+}

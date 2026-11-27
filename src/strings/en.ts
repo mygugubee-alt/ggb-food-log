@@ -92,11 +92,12 @@ export const S = {
 
   // Blood sugar entry
   sugarScan: {
-    label: 'Scan from the meter', placeholder: 'Tap, then Scan Text',
-    help: 'iPhone: tap this box, then the Scan Text button (or tap the box again and choose Scan Text). Point the camera at the meter, select the big number, then tap Insert.',
-    found: (v: string, unit: string) => `Found ${v} ${unit}. Check the value below.`,
-    guessed: (v: string, unit: string) => `Read as ${v} ${unit} (the decimal point was not scanned). Check the value below.`,
-    none: 'No reading found in that text. Try again, or type the value below.',
+    label: 'Read from a photo', reading: 'Reading the photo…',
+    help: 'Hold the phone straight in front of the meter so its screen fills most of the photo, with no glare on the numbers. The photo is read on this phone and is not kept.',
+    found: (v: string, unit: string) => `Read ${v} ${unit}. Check the value below before saving.`,
+    guessed: (v: string, unit: string) => `Read as ${v} ${unit} (the decimal point was not clear). Check the value below before saving.`,
+    converted: (mmol: string, v: string) => `Read ${mmol} mmol/L from the meter, filled in as ${v} mg/dL. Check the value below before saving.`,
+    none: 'The number could not be read. Take the photo again, straight on and without glare, or type the value below.',
   },
   newReading: 'New reading', editReading: 'Edit reading', value: 'Value',
   sugarFormat: { mmol_l: 'Enter a number with at most one decimal place, for example 7.0.', mg_dl: 'Enter a whole number, for example 126.' } satisfies Record<SugarUnit, string>,

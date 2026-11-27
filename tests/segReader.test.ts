@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readMonitor, rotate, type Gray } from '../src/services/segReader'
+import { readMeter, readMonitor, rotate, type Gray } from '../src/services/segReader'
 
 // Draws a monitor like the Omron in the user's photo: dark body, light screen, a small
 // PRIOR reading and clock, and SYS / DIA / PULSE in big segment digits on the right.
@@ -68,3 +68,52 @@ describe('reading a blood pressure monitor photo', () => {
     expect([r.systolic, r.diastolic, r.pulse]).toEqual([null, null, null])
   })
 })
+
+// Draws a meter like the Ottai in the user's photo: dark table, white body, grey screen
+// with a small date and clock, "d m" above the value, the value in big italic digits
+// with a decimal point, and the unit beside it.
+function meter(value: string): Gray {
+  const g = canvas(700, 800, 70) // table
+  rect(g, 160, 80, 380, 620, 238) // white body
+  const L = { x: 210, y: 180, w: 280, h: 270 }
+  rect(g, L.x, L.y, L.w, L.h, 185) // grey screen
+  rect(g, L.x, L.y, L.w, 6, 120) // the screen's dark top edge
+  number(g, 297, L.x + 110, L.y + 22, 28); number(g, 1710, L.x + 265, L.y + 22, 28) // date, clock
+  rect(g, L.x + 45, L.y + 68, 7, 12, 60); rect(g, L.x + 60, L.y + 70, 14, 9, 60) // "d m"
+  const h = 120, w = h * 0.55, pitch = h * 0.66
+  const chars = value.split('')
+  const digits = chars.filter((c) => c !== '.')
+  const right = L.x + 205
+  digits.forEach((ch, i) => {
+    const k = digits.length - 1 - i
+    digit(g, Number(ch), right - w - k * pitch, L.y + 92, h, 0.08)
+  })
+  const p = chars.indexOf('.')
+  if (p > 0) {
+    const after = digits.length - p // digits after the point
+    const x = right - w - (after - 1) * pitch - (pitch - w) / 2 - 6
+    rect(g, x, L.y + 92 + h - 12, 12, 12, 60)
+  }
+  rect(g, L.x + 212, L.y + 200, 30, 8, 60); rect(g, L.x + 225, L.y + 214, 5, 12, 60) // "mmol/L"
+  return g
+}
+
+describe('reading a blood sugar meter photo', () => {
+  it('reads the value with its decimal point, ignoring the date, clock and unit', () => {
+    const r = readMeter(meter('5.9'))
+    expect([r.digits, r.pointSeen]).toEqual(['5.9', true])
+  })
+  it('reads other values', () => {
+    for (const v of ['7.2', '10.4', '12.8', '4.0', '3.6']) expect(readMeter(meter(v)).digits).toBe(v)
+  })
+  it('reads a whole number (mg/dL meter)', () => {
+    for (const v of ['126', '98']) expect(readMeter(meter(v))).toMatchObject({ digits: v, pointSeen: false })
+  })
+  it('straightens a slightly tilted photo', () => {
+    for (const deg of [-3, 4]) expect(readMeter(rotate(meter('6.3'), deg)).digits).toBe('6.3')
+  })
+  it('gives nothing for a photo without a meter', () => {
+    expect(readMeter(canvas(400, 300, 128)).digits).toBeNull()
+  })
+})
+

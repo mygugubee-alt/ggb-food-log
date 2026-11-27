@@ -1,7 +1,8 @@
 /**
- * Reads the big segment digits on a blood pressure monitor's screen from a photo,
- * on the phone itself (nothing is sent anywhere). Tuned for screens like Omron's:
- * SYS, DIA and PULSE stacked on the right, a smaller PRIOR reading on the left.
+ * Reads the big segment digits on a blood pressure monitor's or blood sugar meter's
+ * screen from a photo, on the phone itself (nothing is sent anywhere). Tuned for an
+ * Omron monitor (SYS, DIA and PULSE stacked on the right, a smaller PRIOR reading on
+ * the left) and an Ottai meter (one value with a decimal point; see readMeter).
  *
  * Steps: find the light LCD panel inside the dark monitor body, mark the dark
  * pixels against the local background, find the three rows of big digits on the
@@ -59,8 +60,7 @@ function otsu(values: Uint8ClampedArray | number[]): number {
 }
 
 /** Connected parts of a mask (4-neighbour), as bounding boxes with pixel counts. */
-function components(mask: Uint8Array, w: number, h: number): (Box & { n: number; touches: boolean })[] {
-  const label = new Int32Array(w * h)
+function components(mask: Uint8Array, w: number, h: number, label = new Int32Array(w * h)): (Box & { n: number; touches: boolean })[] {
   const out: (Box & { n: number; touches: boolean })[] = []
   const stack: number[] = []
   let next = 1
@@ -323,7 +323,7 @@ const inset = (b: Box, f: number): Box => {
 }
 
 /** Turns the picture by a small angle (degrees) around its centre. */
-export function rotate(img: Gray, deg: number): Gray {
+export function rotate(img: Gray, deg: number, clamp = false): Gray {
   if (deg === 0) return img
   const { width: w, height: h, data } = img
   const a = (deg * Math.PI) / 180, cos = Math.cos(a), sin = Math.sin(a)
@@ -333,7 +333,8 @@ export function rotate(img: Gray, deg: number): Gray {
     for (let x = 0; x < w; x++) {
       const sx = Math.round(cos * (x - cx) + sin * (y - cy) + cx)
       const sy = Math.round(-sin * (x - cx) + cos * (y - cy) + cy)
-      out[y * w + x] = sx >= 0 && sx < w && sy >= 0 && sy < h ? data[sy * w + sx] : 0
+      if (sx >= 0 && sx < w && sy >= 0 && sy < h) out[y * w + x] = data[sy * w + sx]
+      else if (clamp) out[y * w + x] = data[Math.min(h - 1, Math.max(0, sy)) * w + Math.min(w - 1, Math.max(0, sx))]
     }
   }
   return { width: w, height: h, data: out }
@@ -379,4 +380,245 @@ export function debugRows(img: Gray) {
     cols: columnBoxes(m, row),
     cells: digitCells(m, row).map((c) => ({ ...c, bySlant: SLANTS.map((s) => ({ s, seg: SEG_AREAS.map((a) => Math.round(darkness(m, c, a, s) * 100)), r: readCell(m, c, s) })) })),
   }))
+}
+
+// ---------- Blood sugar meter ----------
+//
+// Meters like the Ottai: a grey LCD inside a white body, one big value with a decimal
+// point (5.9), a small date and clock above it and the unit beside it.
+
+export interface MeterResult {
+  /** The digits as shown, with the decimal point if one was seen ("5.9", "59", "126"). */
+  digits: string | null
+  pointSeen: boolean
+  lcd: Box | null
+  row: Box | null
+}
+
+/** Screens to try: the panel inside a dark body, or a grey panel inside a white body. */
+function lcdCandidates(img: Gray): Box[] {
+  const { width: w, height: h, data } = img
+  const out: Box[] = []
+  const first = findLcd(img)
+  if (first && first.w < w) out.push(first)
+  const t = otsu(data)
+  const light = new Uint8Array(w * h)
+  for (let i = 0; i < w * h; i++) light[i] = data[i] > t ? 1 : 0
+  const bodies = components(light, w, h).filter((c) => c.w > w * 0.15 && c.h > h * 0.1).sort((a, b) => b.n - a.n).slice(0, 3)
+  for (const body of bodies) {
+    // Inside a light body, split the white plastic from the greyer screen.
+    const vals: number[] = []
+    for (let y = body.y; y < body.y + body.h; y += 2) for (let x = body.x; x < body.x + body.w; x += 2) {
+      const v = data[y * w + x]
+      if (v > t) vals.push(v)
+    }
+    if (vals.length < 50) continue
+    const t2 = otsu(vals)
+    const bw = body.w, bh = body.h
+    const grey = new Uint8Array(bw * bh)
+    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+      const v = data[(body.y + y) * w + body.x + x]
+      grey[y * bw + x] = v <= t2 ? 1 : 0 // the screen, its digits and anything darker
+    }
+    let best: Box | null = null, bestScore = 0
+    for (const c of components(grey, bw, bh)) {
+      if (c.touches || c.w < bw * 0.25 || c.h < bh * 0.12) continue
+      const aspect = c.w / c.h
+      if (aspect < 0.6 || aspect > 3.2) continue
+      const fill = c.n / (c.w * c.h)
+      if (fill < 0.45) continue
+      const score = c.w * c.h * fill
+      if (score > bestScore) { bestScore = score; best = { x: c.x + body.x, y: c.y + body.y, w: c.w, h: c.h } }
+    }
+    if (best) out.push(best)
+  }
+  out.push({ x: 0, y: 0, w, h })
+  return out
+}
+
+/** Clears marks that touch the edge of the area (the screen's frame and shadows). */
+function clearEdges(m: { mask: Uint8Array; w: number; h: number }): { mask: Uint8Array; w: number; h: number } {
+  const { w, h } = m
+  const mask = m.mask.slice()
+  const stack: number[] = []
+  for (let x = 0; x < w; x++) { stack.push(x, (h - 1) * w + x) }
+  for (let y = 0; y < h; y++) { stack.push(y * w, y * w + w - 1) }
+  while (stack.length) {
+    const p = stack.pop()!
+    if (!mask[p]) continue
+    mask[p] = 0
+    const x = p % w
+    if (x > 0) stack.push(p - 1)
+    if (x < w - 1) stack.push(p + 1)
+    if (p >= w) stack.push(p - w)
+    if (p < (h - 1) * w) stack.push(p + w)
+  }
+  return { mask, w, h }
+}
+
+type Mask = { mask: Uint8Array; w: number; h: number }
+
+/**
+ * The row of big digits on a meter screen: a mask with only the digit bars, and the
+ * small marks at the bottom of the row (the decimal point). Small text close above the
+ * digits ("d m") and the clock are left out, so they cannot join the digits' row.
+ */
+function meterRow(m: Mask): { row: Box; m: Mask; dots: Box[] } | null {
+  const { mask, w, h } = m
+  const label = new Int32Array(w * h)
+  const comps = components(mask, w, h, label)
+  const maxH = Math.max(0, ...comps.map((c) => c.h))
+  if (maxH < 8) return null
+  const tall = comps.filter((c) => c.h >= maxH * 0.5)
+  const top = Math.min(...tall.map((c) => c.y)), bottom = Math.max(...tall.map((c) => c.y + c.h))
+  const ext = (bottom - top) * 0.25 // room for the top and bottom bars when they are separate marks
+  const y0 = top - ext, y1 = bottom + ext
+  const span = y1 - y0
+  const keep = new Set<number>()
+  const dots: Box[] = []
+  comps.forEach((c, i) => {
+    if (c.y < y0 || c.y + c.h > y1) return
+    if (c.h >= span * 0.25 || c.w >= span * 0.25) keep.add(i + 1)
+    else if (c.w <= span * 0.2 && c.h <= span * 0.2 && c.w >= 2 && c.h >= 2 && c.y + c.h >= y1 - span * 0.3) dots.push(c)
+  })
+  const out = new Uint8Array(w * h)
+  let xs = w, xe = 0, ys = h, ye = 0
+  for (let p = 0; p < w * h; p++) {
+    if (!keep.has(label[p])) continue
+    out[p] = 1
+    const x = p % w, y = (p - x) / w
+    if (x < xs) xs = x
+    if (x > xe) xe = x
+    if (y < ys) ys = y
+    if (y > ye) ye = y
+  }
+  if (xe < xs) return null
+  return { row: { x: xs, y: ys, w: xe - xs + 1, h: ye - ys + 1 }, m: { mask: out, w, h }, dots }
+}
+
+/**
+ * Digits of the row, left to right, as boxes in slant-corrected x (x minus the lean at
+ * that height). Correcting the lean opens the gaps between italic digits.
+ */
+function meterDigits(m: Mask, row: Box, slant: number): Box[] {
+  const { mask, w } = m
+  const base = row.y + row.h
+  const lean = Math.ceil(row.h * slant)
+  const x0 = row.x - lean, n = row.w + lean + 1
+  const cols = new Array(n).fill(0)
+  const ys = new Array(n).fill(Infinity), ye = new Array(n).fill(-1)
+  for (let y = row.y; y < base; y++) {
+    const shift = Math.round((base - y) * slant)
+    for (let x = row.x; x < row.x + row.w; x++) {
+      if (!mask[y * w + x]) continue
+      const i = x - shift - x0
+      cols[i]++
+      if (y < ys[i]) ys[i] = y
+      if (y > ye[i]) ye[i] = y
+    }
+  }
+  const boxes = bands(cols, 1, 1, Math.max(1, Math.round(row.h * 0.03))).map((b) => {
+    let top = Infinity, bot = -1
+    for (let i = b.from; i < b.to; i++) { if (ys[i] < top) top = ys[i]; if (ye[i] > bot) bot = ye[i] }
+    return { x: x0 + b.from, y: top, w: b.to - b.from, h: bot - top + 1 }
+  })
+  const maxH = Math.max(0, ...boxes.map((b) => b.h))
+  const tall = boxes.filter((b) => b.h >= maxH * 0.6)
+  if (!tall.length) return []
+  const top = Math.min(...tall.map((b) => b.y))
+  const H = Math.max(...tall.map((b) => b.y + b.h)) - top
+  const wide = tall.filter((b) => b.w > H * 0.35 && b.w < H * 0.85)
+  const W = Math.round(Math.max(H * 0.45, ...wide.map((b) => b.w)))
+  // A digit box much wider than one digit is two digits that touch: split it.
+  const out: Box[] = []
+  for (const b of tall) {
+    const k = Math.max(1, Math.round(b.w / (W * 1.1)))
+    for (let j = 0; j < k; j++) {
+      const right = b.x + b.w - (k - 1 - j) * (b.w / k)
+      out.push({ x: Math.round(right - W), y: top, w: W, h: H }) // right-aligned: a "1" has only its right bars
+    }
+  }
+  return out
+}
+
+interface MeterAttempt { result: MeterResult; score: number }
+
+function readMeterOnce(img: Gray): MeterAttempt {
+  // Every screen and slant gives a reading; readings that several slants agree on win.
+  const all: MeterAttempt[] = []
+  for (const found of lcdCandidates(img)) {
+    const lcd = inset(found, 0.025)
+    if (lcd.w < 20 || lcd.h < 20) continue
+    const r = meterRow(clearEdges(darkMask(img, lcd)))
+    if (!r || r.row.h < lcd.h * 0.15) continue
+    const { row, m, dots } = r
+    for (const slant of SLANTS) {
+      const cells = meterDigits(m, row, slant)
+      if (!cells.length || cells.length > 4) continue
+      const read = cells.map((c) => readCell(m, c, slant))
+      if (read.some((c) => c == null || c === 'blank')) continue
+      const ds = read as { digit: number; miss: number }[]
+      const miss = ds.reduce((t, d) => t + d.miss, 0)
+      // The point: a dot whose (slant-corrected) centre falls between two digits.
+      let point = -1
+      for (const d of dots) {
+        const cx = d.x + d.w / 2 - (row.y + row.h - (d.y + d.h / 2)) * slant
+        const before = cells.filter((c) => c.x + c.w * 0.8 < cx).length
+        const inside = cells.some((c) => cx > c.x + c.w * 0.2 && cx < c.x + c.w * 0.8)
+        if (!inside && before > 0 && before < cells.length) { point = before; break }
+      }
+      // Or a dot joined to the digit beside it: marks low in the gap between two digits, none higher up.
+      for (let i = 0; point < 0 && i < cells.length - 1; i++) {
+        const L = cells[i], R = cells[i + 1]
+        const x0 = 0.98, x1 = (R.x - L.x) / L.w + 0.03 // just the gap
+        if (x1 - x0 < 0.04) continue
+        if (darkness(m, L, [x0, x1, 0.8, 1.0], slant) > 0.15 && darkness(m, L, [x0, x1, 0.3, 0.68], slant) < 0.05) point = i + 1
+      }
+      const text = ds.map((d) => d.digit).join('')
+      const digits = point > 0 ? `${text.slice(0, point)}.${text.slice(point)}` : text
+      if (Number(digits) <= 0) continue
+      const score = 10 - 2 * miss + (point > 0 ? 3 : 0) + (cells.length >= 2 ? 1 : 0)
+      all.push({ result: { digits, pointSeen: point > 0, lcd, row: { x: row.x + lcd.x, y: row.y + lcd.y, w: row.w, h: row.h } }, score })
+    }
+  }
+  let best: MeterAttempt = { result: { digits: null, pointSeen: false, lcd: null, row: null }, score: -1 }
+  const plain = (a: MeterAttempt) => a.result.digits?.replace('.', '')
+  for (const a of all) {
+    const same = all.filter((b) => plain(b) === plain(a))
+    // A point seen at any slant counts for the reading (it is easy to miss, hard to imagine).
+    const withPoint = same.filter((b) => b.result.pointSeen).sort((x, y) => y.score - x.score)[0]
+    const score = Math.max(...same.map((b) => b.score)) + same.length - 1 + (withPoint ? 3 : 0)
+    if (score > best.score) best = { result: (withPoint ?? a).result, score }
+  }
+  return best
+}
+
+/**
+ * Reads the big value on a blood sugar meter. Tries small turns of the photo, in case it
+ * was tilted; the reading that most turns agree on wins.
+ */
+export function readMeter(img: Gray): MeterResult {
+  const tries = [0, -3, 3, -6, 6, -9, 9].map((deg) => readMeterOnce(deg ? rotate(img, deg, true) : img)).filter((a) => a.result.digits)
+  const plain = (a: MeterAttempt) => a.result.digits!.replace('.', '')
+  let best: MeterAttempt | null = null, bestScore = -Infinity
+  for (const a of tries) {
+    const same = tries.filter((b) => plain(b) === plain(a))
+    const withPoint = same.filter((b) => b.result.pointSeen).sort((x, y) => y.score - x.score)[0]
+    const score = Math.max(...same.map((b) => b.score)) + 3 * (same.length - 1)
+    if (score > bestScore) { bestScore = score; best = withPoint ?? a }
+  }
+  return best?.result ?? { digits: null, pointSeen: false, lcd: null, row: null }
+}
+
+/** For tuning: what the meter reader finds on each candidate screen. */
+export function debugMeter(img: Gray) {
+  return lcdCandidates(img).map((found) => {
+    const lcd = inset(found, 0.025)
+    const r = meterRow(clearEdges(darkMask(img, lcd)))
+    if (!r) return { lcd }
+    return {
+      lcd, row: r.row, dots: r.dots,
+      bySlant: SLANTS.map((s) => ({ s, cells: meterDigits(r.m, r.row, s).map((c) => ({ ...c, seg: SEG_AREAS.map((a) => Math.round(darkness(r.m, c, a, s) * 100)), r: readCell(r.m, c, s) })) })),
+    }
+  })
 }

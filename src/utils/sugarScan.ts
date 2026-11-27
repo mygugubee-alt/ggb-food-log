@@ -1,6 +1,7 @@
 import type { SugarUnit } from '../models/types'
+import { formatMmol } from './units'
 
-export interface SugarScan { text: string; guessedPoint: boolean }
+export interface SugarScan { text: string; guessedPoint: boolean; converted?: boolean }
 
 /**
  * Finds the blood sugar value in text scanned from a meter screen (iPhone Live Text),
@@ -28,4 +29,18 @@ export function parseSugarScan(text: string, unit: SugarUnit): SugarScan | null 
   // 59 → 5.9, 123 → 12.3: the point was lost in the scan.
   const withPoint = `${whole.slice(0, -1)}.${whole.slice(-1)}`
   return Number(withPoint) > 0 && Number(withPoint) <= 35 ? { text: withPoint, guessedPoint: true } : null
+}
+
+/**
+ * The value field's text from digits read off a meter photo ("5.9", or "59" when the
+ * point was not seen). A value with a point is mmol/L; it is converted when the app is
+ * set to mg/dL. Returns null when the digits are not a likely reading.
+ */
+export function meterValue(digits: string, pointSeen: boolean, unit: SugarUnit): SugarScan | null {
+  if (pointSeen) {
+    const v = Number(digits)
+    if (!(v > 0 && v <= 35) || !/^\d{1,2}\.\d$/.test(digits)) return null
+    return unit === 'mmol_l' ? { text: digits, guessedPoint: false } : { text: formatMmol(v, 'mg_dl'), guessedPoint: false, converted: true }
+  }
+  return parseSugarScan(digits, unit)
 }

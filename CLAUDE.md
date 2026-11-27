@@ -12,7 +12,7 @@
 - Do not add analytics, third-party scripts, or anything loaded from another site at run time. Bundle everything.
 - Do not add goal suggestions or goal timelines. The daily calorie goal is the user's own optional number (Settings); the app never suggests one. BMI uses only the Malaysian adult bands in `src/services/bmi.ts`.
 - Blood sugar and HbA1c are rated only by the rules in spec section 5.11, blood pressure only by the Malaysian CPG 2018 bands; all in `src/services/ranges.ts`. Do not add other thresholds, diagnoses, or dosing advice.
-- Blood pressure readings (`bp` table, Dexie v4) are typed or read from a photo of the monitor by the app's own segment-digit reader (`src/services/segReader.ts`, tests draw a fake screen in `tests/segReader.test.ts`). It runs on the phone; the photo is not stored or sent anywhere.
+- Blood pressure readings (`bp` table, Dexie v4) are typed or read from a photo of the monitor by the app's own segment-digit reader (`src/services/segReader.ts`, tests draw a fake screen in `tests/segReader.test.ts`). Blood sugar values are read from a photo of the meter the same way (`readMeter`, value rules in `src/utils/sugarScan.ts`). It runs on the phone; the photo is not stored or sent anywhere.
 - Blood sugar: keep `value_mmol` at full precision and `entered_value` / `entered_unit` untouched. Convert and round only at display, with the single constant 18.016 (`src/utils/units.ts`).
 - Timestamps are UTC. Calendar dates are Asia/Kuala_Lumpur (`src/utils/dates.ts`).
 - Every query must leave out rows with `deleted_at` set. Deletes are soft until the Undo window ends (`softDelete` / `restore` / `purge` in `src/db/repo.ts`).

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseSugarScan } from '../src/utils/sugarScan'
+import { meterValue, parseSugarScan } from '../src/utils/sugarScan'
 
 describe('reading a scanned blood sugar meter', () => {
   it('finds the value on an Ottai screen, skipping date and time', () => {
@@ -22,5 +22,24 @@ describe('reading a scanned blood sugar meter', () => {
   it('returns null when nothing fits', () => {
     expect(parseSugarScan('Ottai', 'mmol_l')).toBeNull()
     expect(parseSugarScan('29-7 17:10', 'mmol_l')).toBeNull()
+  })
+})
+
+describe('the value from a meter photo', () => {
+  it('uses a value with its point as mmol/L', () => {
+    expect(meterValue('5.9', true, 'mmol_l')).toEqual({ text: '5.9', guessedPoint: false })
+  })
+  it('converts it when the app is set to mg/dL', () => {
+    expect(meterValue('5.9', true, 'mg_dl')).toEqual({ text: '106', guessedPoint: false, converted: true })
+  })
+  it('puts back a point that was not seen, and flags it', () => {
+    expect(meterValue('59', false, 'mmol_l')).toEqual({ text: '5.9', guessedPoint: true })
+  })
+  it('reads whole numbers as mg/dL', () => {
+    expect(meterValue('126', false, 'mg_dl')).toEqual({ text: '126', guessedPoint: false })
+  })
+  it('refuses unlikely values', () => {
+    expect(meterValue('88.8', true, 'mmol_l')).toBeNull()
+    expect(meterValue('0.0', true, 'mmol_l')).toBeNull()
   })
 })
