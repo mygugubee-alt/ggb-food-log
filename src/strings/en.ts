@@ -22,6 +22,7 @@ export const S = {
   // Today
   today: 'Today', prevDay: 'Previous day', nextDay: 'Next day',
   startToday: "Start today's log", nothingLogged: 'Nothing logged for this day',
+  logPad: { title: 'Log', meal: 'Meal', weight: 'Weight', sugar: 'Sugar', bp: 'BP', sport: 'Sport' },
   addMeal: '+ Add meal', addMealPlain: 'Add meal', logWeight: 'Log weight', logSugar: 'Log blood sugar', editDay: 'Edit day',
   weight: 'Weight', calories: 'Calories', bloodSugar: 'Blood sugar', meals: 'Meals', activity: 'Activity', dayNote: 'Day note',
   fromMeals: 'from meals',

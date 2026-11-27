@@ -233,6 +233,18 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
 .plate-rim { fill: none; stroke: var(--line); stroke-width: 2; }
 .plate-shadow { fill: var(--line); opacity: 0.6; }
 .plate-tool { fill: none; stroke: var(--muted); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0.7; }
+.log-pad h2 { font-size: 0.78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 2px 2px 8px; }
+.log-keys { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.log-key { aspect-ratio: 1; min-height: 66px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  padding: 4px 2px; border: 0; border-radius: 16px; cursor: pointer; color: var(--text); font-weight: 650; font-size: 0.8rem; line-height: 1.1;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, #fff) 0%, var(--surface) 55%, color-mix(in srgb, var(--surface) 90%, #000) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 3px 0 color-mix(in srgb, var(--surface) 70%, #000), 0 6px 14px rgba(0, 0, 0, 0.18);
+  transition: transform 0.08s ease, box-shadow 0.08s ease; }
+.log-key:active { transform: translateY(3px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 0 color-mix(in srgb, var(--surface) 70%, #000), 0 2px 6px rgba(0, 0, 0, 0.16); }
+.log-key > * { flex: none; }
+.log-key .badge { align-self: center; width: 32px; height: 32px; border-radius: 10px; }
+.log-key span:last-child { max-width: 100%; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .actions { display: flex; gap: 12px; }
 .actions .btn { flex: 1; padding-inline: 10px; }
 

@@ -70,13 +70,16 @@ export default function Today() {
       <GoalCard />
       <ExportPrompt />
 
-      <button className="btn primary large" onClick={() => nav(`/meal/new?date=${date}`)}><Icon name="plus" />{S.addMealPlain}</button>
-      <div className="actions">
-        <button className="tile" onClick={() => nav(`/day/${date}?focus=weight`)}><Badge name="scale" tone="green" />{S.logWeight}</button>
-        <button className="tile" onClick={() => nav(`/sugar/new?date=${date}`)}><Badge name="drop" tone="blue" />{S.logSugar}</button>
-      </div>
-      <button className="tile" onClick={() => nav(`/bp/new?date=${date}`)}><Badge name="heart" tone="warm" /><span className="grow">{S.bp.log}</span><span className="chev"><Icon name="chevron" size={18} /></span></button>
-      <button className="tile" onClick={() => nav(`/activity/new?date=${date}`)}><Badge name="pulse" tone="green" /><span className="grow">{S.act.add}</span><span className="chev"><Icon name="chevron" size={18} /></span></button>
+      <section className="log-pad" aria-labelledby="log-title">
+        <h2 id="log-title">{S.logPad.title}</h2>
+        <div className="log-keys">
+          <button className="log-key" onClick={() => nav(`/meal/new?date=${date}`)}><Badge name="utensils" tone="warm" /><span>{S.logPad.meal}</span></button>
+          <button className="log-key" onClick={() => nav(`/day/${date}?focus=weight`)}><Badge name="scale" tone="green" /><span>{S.logPad.weight}</span></button>
+          <button className="log-key" onClick={() => nav(`/sugar/new?date=${date}`)}><Badge name="drop" tone="blue" /><span>{S.logPad.sugar}</span></button>
+          <button className="log-key" onClick={() => nav(`/bp/new?date=${date}`)}><Badge name="heart" tone="warm" /><span>{S.logPad.bp}</span></button>
+          <button className="log-key" onClick={() => nav(`/activity/new?date=${date}`)}><Badge name="pulse" tone="green" /><span>{S.logPad.sport}</span></button>
+        </div>
+      </section>
 
 
       {bundle && !isLogged(bundle) && (
