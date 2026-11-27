@@ -131,6 +131,7 @@ export const S = {
   daysWithWeight: 'Days with a weight', readingsCount: 'Readings', daysWithReadings: 'Days with readings',
   averageFor: (context: string, n: number) => `${context} average (${n} ${n === 1 ? 'reading' : 'readings'})`,
   averageOf: (n: number, what: 'days' | 'readings') => `Average (${n} ${n === 1 ? what.slice(0, -1) : what})`,
+  showMealList: (n: number) => `Show what I ate (${n} ${n === 1 ? 'meal' : 'meals'})`, hideMealList: 'Hide what I ate',
   mealsLogged: 'Meals logged', daysWithPhotos: 'Days with photos',
   avgDailyCalories: (n: number) => `Average daily calories (${n} ${n === 1 ? 'day' : 'days'} used)`,
   totalCalories: 'Total calories', caloriesFromMeals: (n: number) => `${n} ${n === 1 ? 'day uses' : 'days use'} the sum of meal calories.`,

@@ -245,6 +245,25 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
 .log-key > * { flex: none; }
 .log-key .badge { align-self: center; width: 32px; height: 32px; border-radius: 10px; }
 .log-key span:last-child { max-width: 100%; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-sec { --sec: #c2456e; --sec-soft: #fbe3eb; }
+.sec-sugar { --sec: #2466b8; --sec-soft: #e0ebfa; }
+.sec-activity { --sec: #1f7a5f; --sec-soft: #dcf0e8; }
+.sec-food { --sec: #b9541f; --sec-soft: #fbe6d8; }
+.sec-notes { --sec: #5b49c4; --sec-soft: #ece9fc; }
+@media (prefers-color-scheme: dark) {
+  .report-sec { --sec: #f29bb7; --sec-soft: #3a1b27; }
+  .sec-sugar { --sec: #7db3f5; --sec-soft: #182b44; }
+  .sec-activity { --sec: #63c7ad; --sec-soft: #1b352e; }
+  .sec-food { --sec: #f3a273; --sec-soft: #3b2619; }
+  .sec-notes { --sec: #b3a8f5; --sec-soft: #262148; }
+}
+.card h2.sec-title { background: var(--sec-soft); color: var(--sec); margin: -4px -4px 10px; padding: 9px 12px; border-radius: 12px; }
+.fold-btn { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; min-height: 48px; padding: 10px 14px;
+  border: 0; border-radius: 14px; background: var(--sec-soft, var(--field)); color: var(--sec, var(--text)); font-weight: 650; font-size: 0.95rem; cursor: pointer; text-align: left; }
+.fold-chev { display: inline-flex; transform: rotate(90deg); transition: transform 0.15s ease; }
+.fold-chev.open { transform: rotate(-90deg); }
+.meal-days.folded { display: none; }
+@media print { .meal-days.folded { display: block; } }
 .actions { display: flex; gap: 12px; }
 .actions .btn { flex: 1; padding-inline: 10px; }
 

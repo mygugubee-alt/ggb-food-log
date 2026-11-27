@@ -14,10 +14,11 @@ import { useSettings } from '../components/hooks'
 import { mealTitle } from '../components/rows'
 import { Page } from '../components/ui'
 
-function Section({ title, icon, empty, children }: { title: string; icon: IconName; empty: boolean; children: ReactNode }) {
+type Tone = 'weight' | 'sugar' | 'activity' | 'food' | 'notes'
+function Section({ title, icon, tone, empty, children }: { title: string; icon: IconName; tone: Tone; empty: boolean; children: ReactNode }) {
   return (
-    <section className="card">
-      <h2><Icon name={icon} size={16} />{title}</h2>
+    <section className={`card report-sec sec-${tone}`}>
+      <h2 className="sec-title"><Icon name={icon} size={16} />{title}</h2>
       {empty ? <p className="muted">{S.noData}</p> : children}
     </section>
   )
@@ -31,6 +32,7 @@ export default function Report() {
   const today = todayKL()
   /** Weeks back from the current week. 1 = the most recent full week. */
   const [back, setBack] = useState(1)
+  const [showMeals, setShowMeals] = useState(false)
   const start = addDays(weekStartOf(today, settings.week_start), -7 * back)
   const dates = useMemo(() => weekDates(start), [start])
   const end = dates[6]
@@ -75,7 +77,7 @@ export default function Report() {
             {S.daysLogged(report.loggedDays)}{back === 0 ? ` · ${S.weekInProgress}` : ''}
           </p>
 
-          <Section icon="scale" title={S.weight} empty={!weight}>
+          <Section icon="scale" tone="weight" title={S.weight} empty={!weight}>
             {weight && (
               <>
                 <dl className="stats">
@@ -94,7 +96,7 @@ export default function Report() {
             )}
           </Section>
 
-          <Section icon="drop" title={`${S.bloodSugar} (${unitLabel(unit)})`} empty={!sugar}>
+          <Section icon="drop" tone="sugar" title={`${S.bloodSugar} (${unitLabel(unit)})`} empty={!sugar}>
             {sugar && (
               <>
                 <dl className="stats">
@@ -130,38 +132,7 @@ export default function Report() {
             )}
           </Section>
 
-          <Section icon="utensils" title={S.food} empty={!food}>
-            {food && (
-              <>
-                <dl className="stats">
-                  <Stat label={S.mealsLogged} value={String(food.mealCount)} />
-                  {MEAL_TYPES.map((t) => <Stat key={t} label={S.mealType[t]} value={String(food.byType[t])} />)}
-                  <Stat label={S.daysWithPhotos} value={String(food.daysWithPhotos)} />
-                  {food.calories && (
-                    <>
-                      <Stat label={S.avgDailyCalories(food.calories.daysUsed)} value={`${formatKcal(food.calories.average)} ${S.kcal}`} />
-                      <Stat label={S.totalCalories} value={`${formatKcal(food.calories.total)} ${S.kcal}`} />
-                    </>
-                  )}
-                </dl>
-                {food.days.map((d) => (
-                  <div key={d.date} style={{ marginTop: 12 }}>
-                    <strong>{formatWeekday(d.date)}, {formatShort(d.date)}</strong>
-                    <ul className="list">
-                      {d.meals.map((m) => (
-                        <li key={m.id} style={{ padding: '6px 0' }}>
-                          <span className="sub">{mealTitle(m)}</span>
-                          {m.description && <div className="pre">{m.description}</div>}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </>
-            )}
-          </Section>
-
-          <Section icon="pulse" title={S.activity} empty={!activity}>
+          <Section icon="pulse" tone="activity" title={S.activity} empty={!activity}>
             {activity && (
               <dl className="stats">
                 <Stat label={S.act.daysWith} value={String(activity.days)} />
@@ -176,7 +147,44 @@ export default function Report() {
             )}
           </Section>
 
-          <Section icon="note" title={S.notes} empty={report.notes.length === 0}>
+          <Section icon="utensils" tone="food" title={S.food} empty={!food}>
+            {food && (
+              <>
+                <dl className="stats">
+                  <Stat label={S.mealsLogged} value={String(food.mealCount)} />
+                  {MEAL_TYPES.map((t) => <Stat key={t} label={S.mealType[t]} value={String(food.byType[t])} />)}
+                  <Stat label={S.daysWithPhotos} value={String(food.daysWithPhotos)} />
+                  {food.calories && (
+                    <>
+                      <Stat label={S.avgDailyCalories(food.calories.daysUsed)} value={`${formatKcal(food.calories.average)} ${S.kcal}`} />
+                      <Stat label={S.totalCalories} value={`${formatKcal(food.calories.total)} ${S.kcal}`} />
+                    </>
+                  )}
+                </dl>
+                <button type="button" className="fold-btn no-print" aria-expanded={showMeals} onClick={() => setShowMeals((v) => !v)}>
+                  <span>{showMeals ? S.hideMealList : S.showMealList(food.mealCount)}</span>
+                  <span className={`fold-chev${showMeals ? ' open' : ''}`}><Icon name="chevron" size={18} /></span>
+                </button>
+                <div className={`meal-days${showMeals ? '' : ' folded'}`}>
+                  {food.days.map((d) => (
+                    <div key={d.date} style={{ marginTop: 12 }}>
+                      <strong>{formatWeekday(d.date)}, {formatShort(d.date)}</strong>
+                      <ul className="list">
+                        {d.meals.map((m) => (
+                          <li key={m.id} style={{ padding: '6px 0' }}>
+                            <span className="sub">{mealTitle(m)}</span>
+                            {m.description && <div className="pre">{m.description}</div>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </Section>
+
+          <Section icon="note" tone="notes" title={S.notes} empty={report.notes.length === 0}>
             <ul className="list">
               {report.notes.map((n) => (
                 <li key={n.date} style={{ padding: '6px 0' }}>
